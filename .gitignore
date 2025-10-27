@@ -1,6 +1,12 @@
 # Python-generated files
 __pycache__/
 *.py[oc]
+*.aux
+*.fls
+*.synctex.gz
+*.pdf
+*.latexmk
+latex.out
 build/
 dist/
 wheels/
