@@ -1,0 +1,406 @@
+\documentclass[10pt,aps,pre,twocolumn,nofootinbib,superscriptaddress,longbibliography]{revtex4-1}
+\usepackage[colorinlistoftodos,textsize=tiny]{todonotes}
+\usepackage[english]{babel}
+\usepackage[utf8x]{inputenc}
+\usepackage{amsmath,amsfonts,amssymb,amsthm}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{color}
+\usepackage{hyphenat}
+\usepackage{natbib}
+\usepackage{microtype}
+\usepackage{mathpazo}
+\usepackage{cleveref}
+%\usepackage[labelformat = empty,position=top]{subcaption}
+\usepackage{pgfplots}
+\usepackage{pgfgantt}
+\usepackage[linesnumbered,ruled,vlined]{algorithm2e}
+\usepackage{tikz}
+\usepackage{mathtools}
+
+\SetKwInput{KwInput}{Input}                % Set the Input
+\SetKwInput{KwOutput}{Output}              % set the Output
+
+\usetikzlibrary{calc}
+\pgfplotsset{compat=newest}
+\pgfplotsset{plot coordinates/math parser=false}
+\linespread{1.09}
+
+\newcommand{\brho}{\boldsymbol \rho}
+\newcommand{\bsigma}{\boldsymbol \sigma}
+\newcommand{\btheta}{\boldsymbol \theta}
+\newcommand{\bmu}{\boldsymbol \mu}
+\newcommand{\bA}{\mathbf{A}}
+\newcommand{\bS}{\mathbf{S}}
+\newcommand{\bC}{\mathbf{C}}
+\newcommand{\bD}{\mathbf{D}}
+\newcommand{\bE}[1]{\operatorname{\mathbb{E}}\left\lbrack #1\right\rbrack}
+%\newcommand{\bE}[1]{\left \langle #1 \right\rangle}
+\newcommand{\bH}{\mathbf{H}}
+\newcommand{\bI}{\mathbf{I}}
+\newcommand{\bL}{\mathbf{L}}
+\newcommand{\bMc}{\mathbfcal{M}}
+\newcommand{\bM}{\mathbf{M}}
+\newcommand{\bN}{\mathbf{N}}
+\newcommand{\bT}{\mathbf{T}}
+\newcommand{\bW}{\mathbf{W}}
+\newcommand{\bXc}{\mathbfcal{X}}
+\newcommand{\bz}{\mathbf{z}}
+\newcommand{\bX}{\mathbf{X}}
+\newcommand{\bY}{\mathbf{Y}}
+\newcommand{\Tr}[1]{\operatorname{Tr}\left\lbrack #1\right\rbrack}
+%\newcommand{\bE}[1]{\left\langle #1 \bigl \vert  \btheta \right\rangle }
+\DeclareMathOperator*{\argmax}{argmax}
+\newcommand{\argmin}{\operatorname{argmin}}
+\renewcommand{\Im}[1]{\operatorname{Im} #1 }
+\newcommand{\bra}[1]{\left \langle #1 \right|}
+\newcommand{\ket}[1]{\left | #1 \right \rangle}
+
+\Crefname{equation}{Eq.}{Eqs.}
+\pgfdeclarelayer{background}
+\pgfdeclarelayer{foreground}
+\pgfsetlayers{background,main,foreground}
+
+
+\begin{document}
+\title{Thermodynamics of random spanning forests on complex networks}
+\author{Carlo Nicolini}
+\affiliation{Center for Neuroscience and Cognitive Systems, Istituto Italiano di Tecnologia, Corso Bettini 31, 38068 Rovereto (TN), Italy}
+\date{\today}
+
+\begin{abstract}
+In this work we deduce a novel interpretation of the Boltzmann partition function within the framework of spectral entropies, in terms of the statistics of random spanning forests. 
+We exploit the sampling method provided by the Wilson algorithm to sample random spanning forest with a temperature parameter $q$ and show that this parameter can be set as the inverse normalized diffusion time of the random walker describing a diffusion process on the network.
+This analogy makes it possible to decompose the Boltzmann partition function in the high temperature limit as the contribution of rooted random spanning forests, whose trees are relatively small.
+This study casts one the first bridges between the statistics of rooted random spanning forests and randomized algorithms to sample from their probability distribution, and the statistical mechanics of complex networks, paving the way to a sound and rigorous network information theory.
+\end{abstract}
+\maketitle
+
+\section{Introduction}
+Statistical physics and complex networks are two research fields which are deeply interconnected.
+
+Here we establish a link between the statistics of rooted random forests on graphs, their thermodynamical analysis and graph characteristic polynomials.
+We commence from the Boltzmann partition function introduced in the seminal work of spectral entropies.
+The Hamiltonian of the system is chosen to be equivalent to the graph combinatorial Laplacian $\bL$, where $\beta$ can be interpreted as an inverse temperature parameter (setting $\beta=(k T)^{-1}$ with the Boltzmann constant $k=1$ for the rest of this work).
+However a different interpretation is the one that sees $\beta$ as the diffusion time of a continuos random walker, hence modeling the spread of material over the network. Indeed the solution of the heat equation has the same kernel.
+
+\subsection{Notation}
+\subsubsection{Graph theory and associated matrices}
+We summarize here a few definitions which are necessary to make this paper self-contained.
+Let us consider undirected graphs $G=(V,E)$ with $|V|=n$ number of nodes and $|E|=m$ number of links. If graphs are weighted, then $W$ denotes the sum of all edge weights, and $w(e)$ indicates the weight of the edge $e$ between nodes $(u,v)$.
+
+The adjacency matrix is denoted as $\bA=\{a_{ij}\}$ and the (combinatorial) graph Laplacian as $\bL = \bD - \bA$, where $\bD$ is the diagonal matrix of the node degrees.
+Similarly, for weighted networks the weighted adjacency matrix is indicated as $\bW = \{ w_{ij}\}$ and the weighted Laplacian as $\bL = \bS - \bW$, where $\bS$ is the diagonal matrix of the node strengths.
+
+Notably, the (combinatorial) Laplacian matrix associated with an undirected graph is a semi-positive definite matrix, meaning that all its eigenvalues $\lambda_1=0 \leq \ldots \leq \lambda_n$ are positive (or zero) and real. Importantly, the multiplicity of the zero eigenvalue $\lambda_1$ counts the number of weakly connected components of the graph $G$.
+
+\subsubsection{Trees, forests, random walks}
+A rooted spanning forest $\phi$ is a directed subgraph of $G$ without cycles, with the same vertex set $V$ of $G$ and such that for each node $u \in V$ there is at most one vertex $v \in V$ where $(u,v)$ is an edge of $\phi$.
+The root set $\mathcal{R}(\phi)$ of the forest $\phi$ is the subset of vertices of $V$ for which there is no oriented edge $(u,v)$ in the forest $\phi$.
+Being a forest, the connected components of $\phi$ are trees, with edges oriented towards their roots.
+The set of all spanning forests $\phi$ of a graph $G$ is denoted by $\mathcal{F}$.
+
+A random spanning forest $\Phi_q$ for $q>0$ is a random variable distributed with the following law:
+\begin{equation}\label{eq:tree_probability}
+\textrm{Pr}\lbrack \Phi_q=\phi\rbrack = \frac{w(\phi)q^{|\mathcal{R}(\phi)|}} {\chi(q)}.
+\end{equation}
+Here $w(\phi) = \prod_{e \in \phi} w(e)$ is the weight associated to the forest $\phi$.
+The number of trees in the forest $\phi$ (or the number of roots) is denoted by the cardinality of the root set $|\mathcal{R}(\phi)|$.
+The denominator $\chi(q)$ is a normalization factor. It represents the ``partition function'' of the probability law of Eq.~\ref{eq:tree_probability} and has the meaning of counting all the weighted rooted forests in the set $\mathcal{F}$:
+\begin{equation}
+\chi(q) = \sum_{\phi \in \mathcal{F}} w(\phi) q^{|\mathcal{R}(\phi)|}.
+\end{equation}
+A classical result in graph theory is the Kirchoff matrix-tree theorem~\cite{lyons2017probability,avena2018,avena2018a}, stating that the number of uniform spanning trees of a graph is specified by the determinant of the minors of the corresponding combinatorial Laplacian $\bL$, or equivalently is equals the product of non-zero eigenvalues of $\bL$.
+By evoking a variation of the Markov matrix-tree theorem~\cite{avena2018a}, and the properties of the determinant, the normalization factor $\chi(q)$ which is the characteristic polynomial of the $-\bL$, can be written as the determinant of the matrix $q\bI + \bL$:
+\begin{equation}\label{eq:chi_partition_function}
+\chi(q) = \det(q\bI + \bL) = \prod_{i=1}^{n}(q+\lambda_i).
+\end{equation}
+In the case $q=1$, Chebotarev and Shamis found that $\det(\bI + \bL)$ is exactly the (integer) number of rooted spanning forests of the graph $G$, a result known as the \emph{matrix-forest theorem}~\cite{chebotarev2006matrix,chebotarev2002forest}.
+Equation~\ref{eq:chi_partition_function} is also interpreted as the parametric version of matrix-forests theorem~\cite{agaev2000} to graphs with edges weighted by the factor $1/q$.
+In fact, it is simple to see that:
+\begin{equation}
+\det(q\bI + \bL) = q^n \det(\bI + \bL/q).
+\end{equation}
+% Moreover, a lot can be said about the matrix $\mathbf{Q} = (\bI + \tau \bL)^{-1}$. Its elements are determined as the ratio between  has elements $\mathbf{Q}_{ij}$ determined by 
+% \begin{equation}
+% Q_{ij} = \frac{\sum_{k=0}^{n} \tau^k \epsilon(\mathcal{F}^{ij}_k)}{\sum_{k=0}^{n} \tau^k \epsilon(\mathcal{F}_k)}
+% \end{equation}
+% where $\mathcal{F}_k$ is the set of all rooted spanning forests of $G$ containing exactly $k$ edges, $\mathcal{F}^{ij}_k$ is the set of all $k$-edge spanning rooted forests of $G$ where $j$ belongs to the tree rooted in $i$.
+
+This result highlights the twofold role of $q$. On one hand, this parameter is deterministically coupled to the eigenvalues of the combinatorial Laplacian, but at the same time it gives an operative interpretation in terms of combinatorial structures of the graph.
+
+It is intuitively simple to see that in the limit $q\to 0$ the random variable $\Phi_q$ describes a random spanning tree on $n$ nodes with exactly $n-1$ links. In the large $q$ limit instead one obtains a degenerate forest with $n$ trees but no links~\cite{avena2018}.
+
+There is an intriguing way to understand the role of $q$ in terms of loop-erased random walks on graphs.
+To see this, one can extend the graph $G$ obtaining an augmented graph $G'=(V',E',w')$ with an extra \emph{absorbing} vertex $r$ connected to every node in $V$ to $r$ with directed edges with weight $q$.
+Running a loop-erased random walk on the augmented graph defines a series of trajectories, all rooted in $r$.
+Then, in order to sample from the distribution in Eq.~\ref{eq:tree_probability}, one only has to remove the root node $r$ from the random spanning tree built on the augmented graph $G'$.
+This idea is at the basis of the Wilson algorithm, a simple yet efficient method to generate random spanning forest with distribution as in Eq.~\ref{eq:tree_probability}.
+This algorithm is of fundamental importance in the rest of this work, and it enables to cast a bridge between theory of continuous time random walks on graphs, spectral entropies framework and statistical mechanics.
+
+% Figure~\ref{fig:sampling_phi_q} shows an example of a random spanning forest represented by a realization of $\Phi_q$ for a simple grid graph, with the partition induced by $\Phi_q$ drawn in two different colors, and the root set $\mathcal{R}(\Phi_q)$ indicated by red nodes.
+% \begin{figure}[htb]
+% \centering
+% \input{images/wilson_example_grid_10x6_q_01.tex}
+% \caption{Sample of a rooted spanning forest $\phi \in \mathcal{F}$ with $q=0.1$ for a grid graph with $10\times 6$ nodes. Every walk starting from one of the gray vertices always ends in one of the roots (red vertices). This sample is a forest of two trees, hence two roots. The two trees are drawn in light blue and light orange.}
+% \label{fig:sampling_phi_q}
+% \end{figure}
+
+% In order to make the meaning of the parameter $q$ clearer, we now consider a generalized version of Eq.~\ref{eq:tree_probability}. 
+% We denote the random variable $\Phi_{q,\mathcal{B}} \in \mathcal{F}$ for a subset $\mathcal{B} \subset V$ distributed as $\Phi_q$ conditioned on the event that $\mathcal{B}$ is a subset of the root set $\mathcal{R}(\Phi_q)$.
+% For any forest $\phi \in \mathcal{F}$ we then obtain the generalized distribution:
+% \begin{equation}\label{eq:tree_probability_extended}
+% \mathbb{P}\left(\Phi_{q,\mathcal{B}} = \phi \right) = \frac{w(\phi) q^{|\mathcal{R}(\phi)| - |\mathcal{B}|}}{\chi_{\mathcal{B}}(q)}\mathbb{1}_{\{\mathcal{B} \subset \mathcal{R}(\phi)\}}
+% \end{equation}
+% It can be seen that one can recover the same probability density function as from Eq~\ref{eq:tree_probability} by setting $\mathcal{B}=\emptyset$, hence obtaining $\chi(q)=\chi_{\emptyset}(q)$.
+% If $\mathcal{B}$ contains a single node $r$, then $\Phi_{q=0,r}$ is the probability of a classical random spanning tree with given root $r$.
+
+
+% The partition function $\chi_{\mathcal{B}}(q)$ is the characteristic polynomial of the combinatorial Laplacian with the rows and colums corresponding to the nodes in the set $\mathcal{B}$ removed.
+% More specifically we can express the reduced partition function as:
+% \begin{equation}
+% \chi_{\mathcal{B}}(q) = \det \left( q\bI + [\bL]^{\{\mathcal{B}\}} \right) = \prod_{i \in V\setminus \mathcal{B}} (q + \lambda_i)
+% \end{equation}
+% where $[\bL]^{\{\mathcal{B}\}}$ is the Laplacian with rows and columns corresponding to the nodes in $\mathcal{B}$ removed.
+
+% Indeed, we can identify the normalization factor $\chi(q)$ as the characteristic polynomial of $\bL$ and it equals the product of the eigenvalues of the matrix $q \bI - \bL$.
+% Assuming that $G$ has only one weakly connected component then:
+% \begin{equation}
+% \chi(q) = \sum_{\phi \in \mathcal{F}} w(\phi) q^{|\mathcal{R}(\phi)|} = q \prod\limits_{i=2}^n (q - \lambda_i) = \prod_{i=1}^n (q - \lambda_i).
+% \end{equation}
+% Equivalently, indicating $\det_X(q\bI - \bL)$ as the determinant restricted to the set $X = V\setminus \{x\}$ obtained by removing one vertex $x$ from $V$, 
+% $\chi(q)$ is written as the characteristic polynomial of $q\bI -\bL$ with the rows and columns corresponding to nodes $x\in X$ removed:
+% \begin{equation}
+% \chi(q) = \det_{X} \left(q\bI - \bL \right)
+% \end{equation}
+% This last equation indicates that $\chi(q)$ is exactly the characteristic polynomial of $\bL$ with roots in $q=\lambda_i$.
+% A very large literature covers all the details of \emph{determinantal} processes as random processes connected with the partition function $\chi(q)$.
+% This kind of results are rooted in the Kirchoff's works, but here we stress the importance of the parameter $q$.
+
+In the next section we focus on the graph-theoretic aspects of this kind of processes, and explore the tight relation between the combinatorial aspects of random rooted forests and the thermodynamics of heat diffusion in complex networks.
+
+%\input{images/wilson_algorithm.tex}
+
+\section{Statistical mechanical of spectral maximum entropy model}
+The spectral entropies framework can be seen as an extension of the maximum entropy random graph model based on the Von Neumann entropy instead of the classical Shannon entropy.
+It relies on the definition of the Von Neumann entropy of a networks, that is based on the spectral properties of the network's Laplacian.
+As a result, by replacing the Shannon entropy with the Von Neumann entropy~\cite{dedomenico2016b,nicolini2018}
+\begin{equation}\label{eq:vonneumann_entropy}
+S(\brho) = - \Tr{\brho \log \brho}
+\end{equation}
+and constraining the associated Lagrangian problem by requiring the networks in the ensemble to have the same Laplacian matrix, on average, one finds that the the role of classical probability is replaced by the density matrix $\brho$
+\begin{equation}\label{eq:density_matrix}
+\brho = \frac{e^{-\beta \bL}}{\Tr{e^{-\beta \bL}}}
+\end{equation}
+which describes the result of constraining the diffusion properties on the networks.
+Here $\beta$ is the lagrangian multiplier pertaining to $\bL$, and is deeply associated to the Laplacian eigenvalues, and in particular to the formal parameter $q$. We here anticipate that setting $q=1/\beta$ highlights the relation between random spanning forests and thermodynamical aspects of the spectral entropies framework.
+In classical statistical mechanics $\beta$ represents an inverse temperature parameter, but can also be seen as a normalized time~\cite{nicolini2018} when modeling diffusion of heat over the network.
+Hence, the relation $q=1/\beta$ indicates that $q$ can either be interpreted as a temperature, or a temporal period related to the process of diffusion.
+
+Importantly, in the spectral entropies framework the Boltzmann partition function $Z(\beta)$ takes the form of a trace over the states described by the eigenvalues of $\bL$ weighted by a Boltzmann factor:
+\begin{equation}\label{eq:z}
+Z(\beta) = \Tr{e^{-\beta\bL}} = \sum_{i=1}^n e^{-\beta \lambda_i}.
+\end{equation}
+For further usage, we remember that the series expansion of the partition function $Z(\beta)$ reads
+\begin{equation}\label{eq:z_approx}
+Z(\beta) = \Tr{\bI - \beta \bL + \frac{1}{2}\beta^2 \bL^2 - \frac{1}{6}\beta^3 \bL^3 + \ldots }.
+\end{equation}
+Here we want to give a physical and practical interpretation to the partition function $Z$ in terms of the statistics of the random variable $\Phi_q$, and more specifically in terms network based quantities such as the degree statistics.
+To do this, we first note that for a positive definite matrix and exploiting the properties of the determinant, we can write the characteristic polynomial of $-\bL$ in Eq.~\ref{eq:chi_partition_function} as:
+\begin{equation}
+\chi(q) = \det(q\bI + \bL) = e^{\Tr{\log\left(q\bI + \bL \right)}}.
+\end{equation}
+where here the logarithm is meant as the matrix functional $\log(\cdot)$.
+Taking the (scalar) logarithm of the characteristic polynomial $\chi(q)$ is hence written as a trace of the matrix logarithm as follows:
+\begin{equation}
+\log \chi(q) = \Tr{\log(q \bI + \bL)}.
+\end{equation}
+Replacing the parameter $q$ with $1/\beta$, and rewriting the log determinant as a function of $\beta$, we obtain an expression for the logarithm of the random forests partition function:
+\begin{equation}\label{eq:logchi_beta}
+\log \chi \left(\beta\right) = \Tr{\log(\bI + \beta \bL)} - n\log \beta.
+\end{equation}
+Interestingly Equation~\ref{eq:logchi_beta} is related to the logarithm of the inverse Ihara zeta function of the graph Laplacian.
+Indeed, if we identify the inverse Ihara zeta function as the following expression, for any real $x$
+\begin{equation}
+\zeta^{-1}(x) = \det \left (\bI - x\bL \right),
+\end{equation}
+then it is simple to see that $\log \chi(\beta) = -\log \zeta^{-1}(-\beta)$.
+This idea has been presented already in Ref.~\cite{ye2015} but to our knowledge this is the first time that the interplay between statistical mechanics, random forests and Ihara zeta functions is observed starting from first principles.
+
+The expression in Eq.~\ref{eq:logchi_beta} can be expanded in Mercator series till the second order, with the only requirement that $\| \beta \bL\| \leq 1$, i.e. the maximum eigenvalue of the Laplacian $\lambda_{\max}$ does not exceed $\beta$, in other words one requires $\beta \leq \lambda_{\max}^{-1}$.
+\begin{equation}
+\log \chi(\beta) \approx \Tr{ \beta \bL - \frac{1}{2}(\beta \bL)^2 } - n\log \beta + \mathcal{O}((\beta \bL)^3).
+\end{equation}
+As a result we find that the linear and quadratic terms in the series expansion of $\log\chi(\beta)$ in Eq.~\ref{eq:logchi_beta} correspond to the first two terms with inverted signs of the expansion of the partition function as from Eq.~\ref{eq:z_approx}.
+
+This fundamental relation gives a practical interpretation to the meaning of the partition function $Z(\beta)$, at least in the $\beta \to 0$ limit.
+\begin{equation}\label{eq:z_logchi}
+Z(\beta) = n - \log\chi(\beta) + r(\beta)
+\end{equation}
+where $r(\beta)$ is the residual computed simply as:
+\begin{equation}
+r(\beta) = \sum_{k=3}^{\infty}\left( \frac{(-1)^k}{k!} + \frac{(-1)^{k+1}}{k} \right)\Tr{\left(\beta \bL\right)^k}
+\end{equation}
+Having a simple and interpretable expression for the partition function as in Eq.~\ref{eq:z_logchi} we can obtain the thermodynamic variables, such as the average energy or other functionals like the Von Neumann entropy.
+\todo{Da qui in poi da correggere i calcoli}
+\subsection{Thermodynamics}
+Although it is possible to compute a number of thermodynamic variables from the derivatives of the logarithm of the partition function, it is hard to understand them in term of standard graph theoretic measures.
+Moreover what we would like to do here is to relate thermodynamic variables to interpretable measures based on the  rooted spanning forests measure as in Eq.~\ref{eq:tree_probability}.
+Hence our goal here is to explore the approximation in Eq.~\ref{eq:tree_probability} that highlights the combinatorial structures at the base of the definition of $Z(\beta)$.
+
+We know for example that the average energy $\Tr{\brho \bL}$ is calculated as:
+\begin{equation}\label{eq:average_energy}
+E = -\frac{\partial \log Z(\beta)}{\partial \beta},
+\end{equation}
+and after some manipulation one can write the Von Neumann entropy as:
+\begin{equation}
+S = -\Tr{\brho \log \brho } = \log Z + \beta E
+\end{equation}
+but unfortunately it is not simple to give a nice interpretation to the quantities emerging from the exact definition of the partition function.
+
+It can be shown that the moments of the probability distribution in~\ref{eq:tree_probability} are found as the derivatives with respect to $q$ of the logarithm of $\chi(q)$, also known as the cumulant generating function of the infinitesimal generator described by $-\bL$.
+As a result, one can obtain an unbiased estimator of the number of roots of a random forest parameterized by the parameter $q$, that reads:
+\begin{align}
+\bE{|\mathcal{R}(\phi)|} &= \frac{\partial }{\partial q}\log \chi(q) = \frac{\partial}{\partial q} \Tr{\log(q\bI + \bL)}\nonumber \\ &= q\Tr{(q\bI + \bL)^{-1}}
+\end{align}
+which by the properties of traces can be written as
+\begin{equation}\label{eq:number_roots}
+\bE{|\mathcal{R}(\phi)|} = \sum_{i=1}^n \frac{q}{q+\lambda_i}
+\end{equation}
+We indicate the quantity in Eq.~\ref{eq:number_roots} also as $s(q)$ as it can be seen as a rescaled Stieltjes transform evaluated on the negative real axis\cite{nadakuditi2013}.
+The Stieltjes transform of the Laplacian is defined as: 
+\begin{equation}
+    \mathcal{S}_{\bL}(q) = -\frac{1}{n \pi} \Tr{(q\bI - \bL)^{-1}}
+\end{equation}
+hence with this definition~\ref{eq:number_roots} in mind it is clear that $s(q)$ and $\mathcal{S}(q)$ are strictly related as:
+\begin{equation}
+    s(q) = \sum_{i=1}^n \frac{q}{q+\lambda_i} = -n\pi q \mathcal{S}(-q)
+\end{equation}
+
+Importantly, the result of Eq.~\ref{eq:number_roots} defines an operative procedure to get spectral statistics of the Laplacian eigenvalues without the need to compute the eigenvalues, but sampling a large number of random spanning forests $\phi_k$ with the Wilson algorithm and estimating the expectation of the number of roots as:
+\begin{equation}
+\bE{|\mathcal{R}(\phi)|} = \frac{1}{k}\sum_{j=1}^k |\mathcal{R}(\phi_k)|
+\end{equation}
+
+To make an example of the fundamental importance of this application we can see that the average energy is directly proportional to the spanning forests.
+We compute the average energy $E$ as defined in \ref{eq:average_energy}, highlighting the proportionality to the quantity $s(q)$ as:
+\begin{align}
+E &=-\frac{\partial \log Z(\beta)}{\partial \beta} =-\frac{1}{Z} \frac{\partial Z}{\partial \beta} \\
+  &\approx -\frac{1}{Z} \frac{\partial }{\partial \beta}\left(n - \log \chi \right) \\
+  &=\frac{1}{Z} \frac{\partial}{\partial \beta} \Bigl \{\Tr{\log(\bI+\beta \bL)} -n\log \beta \Bigr \} \\
+  &=\frac{1}{Z}\Bigl\{  \Tr{(\bI+\beta \bL)^{-1} \bL - \beta^{-1}\bI}  \Bigr\} \\
+  &=\frac{1}{Z} \sum_{i=1}^n\left( \frac{\lambda_i}{1+\beta \lambda_i} - \frac{1}{\beta}\right) \\
+  &=\frac{1}{Z} \sum_{i=1}^n \frac{\beta \lambda_i - 1 - \beta \lambda_i}{\beta(1+\beta \lambda_i)} =-\frac{1}{Z} \sum_{i=1}^n \frac{1}{\beta(1+\beta \lambda_i)} \\ 
+  &=-Z^{-1} q \sum_{i=1}^n \frac{q}{q+\lambda_i} = -Z^{-1} q s(q)
+\end{align}
+Unfortunately this approximation discards further terms represented by $r(\beta)$ and it would be great to understand whether the additional terms are also represented by higher order momenta of random forests.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Calculation of partition function}
+We remember that: 
+\begin{equation}
+    Z=\Tr{e^{-\beta \bL}} = \int_{0}^{\infty} e^{-\beta x} \varrho(x) dx
+\end{equation}
+where $\varrho(x)$ is the spectral density of the Laplacian
+\begin{equation}
+    \varrho(x) = \frac{1}{n}\sum_{i=1}^n \delta(x-\lambda_i) = 
+\end{equation}
+but the Stieltjes transform is related to the spectral density as
+\begin{equation}
+\mathcal{S}_{\bL}(x) = \int \frac{\varrho(x')}{x-x'} dx'
+\end{equation}
+with a change of variables $x'':=-x'$ we get
+\begin{equation}
+    \mathcal{S}_{\bL}(x) = \int 
+\end{equation}
+% To do this, we start by considering the reciprocal of the Ihara zeta function $\zeta^{-1}(x)$, a quantity of fundamental importance in spectral graph theory, that is defined for the graph Laplacian in the form of the determinant as:
+% \begin{equation}
+% \zeta^{-1}(x) = \det \left (\bI - x\bL \right)
+% \end{equation}
+
+% On the other side we remember that the characteristic polynomial of the graph Laplacian $\bL$ is defined for a variable $x$ as:
+% \begin{equation}
+% P_{\bL}(x) = \det \left(x\bI - \bL \right)
+% \end{equation}
+% Interestingly, by evoking the multilinearity of the determinant functional, we observe that the Ihara zeta function and the characteristic polynomial are related by a simple transformation:
+% \begin{equation}
+% P_{\bL}(x) = x^n \zeta^{-1}\left(\frac{1}{x}\right)
+% \end{equation}
+% For notational simplificiy we now define the quantity $R_{\bL}(x)$ as:
+% \begin{equation}\label{eq:r}
+% R_{\bL}\left(x\right) := \det\left (\bI - \frac{1}{x} \bL\right).
+% \end{equation}
+
+% Now we identify the polynomial variable $x$ with $\beta^{-1}$.
+% With this in mind we generate two interesting variables that only differ in the sign of the input argument. They are:
+% \begin{equation}
+% R_{\bL}^{+} := R_{\bL}\left(\beta \right) = \det (\bI -\beta \bL)
+% \end{equation}
+% and
+% \begin{equation}
+% R_{\bL}^{-} := R_{\bL}\left(-\beta \right) = \det (\bI + \beta \bL)
+% \end{equation}
+% In particular the second variable is a bridge between spectral entropies and the properties of trees and random walks on networks.
+
+
+% \subsection{Random spanning forests}
+% The Markov Chain tree states that the number of spanning trees in a connected network is computed from the determinant of the reduced Laplacian $\hat{\bL} = \bL^{\{u\}}$, obtained from the combinatorial Laplacian by removing the $u$-th row and $u$-th column. Specifically the number of spanning trees of the graph $G$ is $t(G)$:
+% \begin{equation}
+% \det \left( \bL^{\{u\}} \right ) = t(G)
+% \end{equation}
+% Equivalently, $n t(G)$ is equal to the product of the non-zero Laplacian eigenvalues.
+
+% The quantity $R^{-}$ is related to the loop-erased random walks on graphs. 
+% Moreover, one can show that the expected number of roots sampled with the Wilson algorithm with killing time $q$ is an unbiased estimator of a trace of a matrix functional of the Laplacian as:
+% \begin{equation}
+% \bE{| \mathcal{R}(q)|} = q\Tr{(q \bI+ \bL)^{-1}} =  \sum \limits_{i=1}^n \frac{q}{q + \lambda_i}
+% \end{equation}
+% The important intuition that we want to emphasize here is that we can identify the parameter $q$ from the Wilson algorithm as the $\beta$ of the spectral entropies.
+% Aside from mathematical subtleties, both parameters are related to a diffusion phenomenon.
+% While the first is responsible for the definition of a discrete random walk, the second is related to a continuous time random walk.
+
+
+% Computing determinants of a square matrix $\bM$ (that must also be positive definite) is equivalent to computing the exponential of trace of matrix logarithms:
+% \begin{equation}
+% \det(\bM) = e^{\Tr{\log \mathbf{M}}}
+% \end{equation}
+% Taking the logarithm of $R^{+}_{\bL}$ and expanding in power series we can write:
+% \begin{align}
+% \log R^{-}_{\bL} &= \Tr{\log(\bI + \beta\bL)}\nonumber \\ &\approx \Tr{\beta \bL - \frac{\beta^2}{2}\bL^2 + \frac{\beta^3}{3}\bL^3 - \frac{\beta^4}{4}\bL^4 + O(\beta^5\bL^5)}
+% \end{align}
+
+% Similarly by the Taylor expansion of the exact partition function $Z=\Tr{e^{-\beta \bL}}$ we see that we $Z$ can be approximated as:
+% \begin{align}
+% Z(\beta) \approx & n-\Tr{\log(\bI + \beta \bL)}  \nonumber \\ &+\Tr{\sum \limits_{r=3}^{\infty}\left( \frac{(-1)^k}{k!} - \frac{(-1)^k}{k}\right)\beta^k \Tr{\bL^k}}
+% \end{align}
+
+% \subsection{Thermodynamics}
+% We want to compute the energy of the system, so we have:
+
+% \begin{align}
+% E &= -\frac{\partial \log Z}{\partial \beta} = - \frac{1}{Z(\beta)}\frac{\partial Z(\beta)}{\partial \beta} = -\frac{\partial_\beta (n-\log R(-1/\beta))}{n-\log R(-1/\beta)}\nonumber \\ &= \frac{1}{Z(\beta)} \Tr{(\bI + \beta \bL)^{-1} \bL} = \frac{\Tr{(\bI + \beta \bL)^{-1} \bL}}{Z(\beta)} \nonumber \\ &= \frac{\Tr{(\bI + \beta \bL)^{-1} \bL}}{n-\Tr{\log(\bI+\beta L)}} =\frac{1}{n-\log R} \sum_{i=1}^n \frac{\lambda_i}{1+\beta\lambda_i} \nonumber \\ &\approx \frac{1}{n}\Tr{(\bI + \beta  \bL)^{-1}\bL} = \frac{1}{n}\Tr{(\bI -\beta \bL + \beta^2\bL^2 - \beta^3 \bL^3 -\ldots)\bL} \nonumber \\ &= \frac{1}{n}\Tr{\bL - \beta \bL^2 + \beta^2 \bL^3 + \ldots \sum_{k=4}^\infty \beta^{k-1}\bL^k} \\ \nonumber &= \frac{2m}{n} - \beta \frac{\sum_{i=1}^n k_i^2 + 2m }{n} + \beta^2 \frac{\Tr{\bL^3}}{n}
+% \end{align}
+
+% Here we use the approximation
+% \begin{equation}
+% Z(\beta) = n - \log \chi\left(\frac{1}{\beta}\right) -n \log(\beta)
+% \end{equation}
+% keeping in mind that $\log \chi(q)$ is the logarithm of the cardinality of the set $\mathcal{F}$ weighted by the factor $w(\phi)$.
+
+% Then we compute the energy as a function of the number of spanning random forests:
+% \begin{align}
+% E  &= -\partial_\beta \log Z = \frac{1}{Z} \left( \frac{1}{\chi(\beta^{-1})} \partial_{\beta} \Tr{\log\left(\frac{1}{\beta}\bI + \bL \right)} \right) + \frac{n}{\beta} \nonumber \\ &=
+% \end{align}
+
+% We try to compute the Von Neumann entropy
+% \begin{equation}
+% S = -\Tr{\brho \log  \brho} = \log Z + \beta E
+% \end{equation}
+
+% with this approximationn we get for $\beta \to 0$ that:
+
+\bibliographystyle{apsrev4-1}
+\bibliography{biblio3}
+
+
+\end{document}

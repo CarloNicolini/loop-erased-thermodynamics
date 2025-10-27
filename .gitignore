@@ -1,0 +1,36 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+node_modules
+
+# environment variables
+.env
+
+# Virtual environments
+.venv
+.qodo
+
+# OS related stuff
+.DS_Store
+
+# Coverage reports
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+coverage.json
+.pytest_cache/
+
+notebooks
+experiments
+examples
+scripts
+logs
+configs
+
+docs/_static
+docs/_templates
