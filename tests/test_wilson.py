@@ -3,15 +3,13 @@ import sys
 import math
 import numpy as np
 import networkx as nx
-
+from wilson.wilson import Wilson as Wilson1
 
 # Ensure we can import the local src package
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 SRC = os.path.join(ROOT, "src")
 if SRC not in sys.path:
     sys.path.insert(0, SRC)
-
-from wilson.wilson import Wilson as Wilson1
 
 
 def canonical_edge(u, v):
