@@ -19,239 +19,25 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import typer
-from numpy.polynomial.laguerre import laggauss
+from joblib import Parallel, delayed
 from rich import print as rprint
-from scipy.optimize import lsq_linear
 from typing_extensions import Annotated
 
-from wilson.wilson import Wilson
+from wilson.graphs import build_graph, graph_id, relabel_consecutive
+from wilson.inversion import compute_bin_widths, invert_stieltjes_density
+from wilson.parallel import estimate_s_for_validate, sample_wilson_for_q
+from wilson.plotting import save_plot_both_formats
+from wilson.spectral import (
+    heat_trace_from_spectrum,
+    laplacian_eigenvalues,
+    s_from_spectrum,
+    s_from_Z_via_gauss_laguerre,
+)
 
 app = typer.Typer(
     help="Wilson algorithm CLI for thermodynamic graph analysis",
     no_args_is_help=True,
 )
-
-
-# ============================================================================
-# Utility functions
-# ============================================================================
-
-
-def relabel_consecutive(G: nx.Graph) -> nx.Graph:
-    """
-    Relabel graph nodes to consecutive integers 0..n-1.
-
-    Parameters
-    ----------
-    G : nx.Graph
-        Input graph with arbitrary node labels.
-
-    Returns
-    -------
-    nx.Graph
-        Graph with nodes relabeled to 0..n-1.
-    """
-    mapping = {u: i for i, u in enumerate(G.nodes())}
-    return nx.relabel_nodes(G, mapping, copy=True)
-
-
-def build_graph(
-    kind: str,
-    n: int | None = None,
-    p: float | None = None,
-    m: int | None = None,
-    d: int | None = None,
-    rows: int | None = None,
-    cols: int | None = None,
-    seed: int | None = None,
-) -> nx.Graph:
-    """
-    Build a graph from standard families.
-
-    Parameters
-    ----------
-    kind : str
-        Graph family: 'ER', 'BA', 'REG', or 'GRID'.
-    n : int, optional
-        Number of nodes (for ER, BA, REG).
-    p : float, optional
-        Edge probability (for ER).
-    m : int, optional
-        Number of edges per new node (for BA).
-    d : int, optional
-        Degree (for REG).
-    rows : int, optional
-        Number of rows (for GRID).
-    cols : int, optional
-        Number of columns (for GRID).
-    seed : int, optional
-        Random seed for reproducibility.
-
-    Returns
-    -------
-    nx.Graph
-        Generated graph with consecutive integer node labels.
-
-    Raises
-    ------
-    ValueError
-        If required parameters are missing or graph kind is unsupported.
-    """
-    kind = kind.upper()
-    if kind == "ER":
-        if n is None or p is None:
-            raise ValueError("ER graph requires --n and --p")
-        G = nx.erdos_renyi_graph(n, p, seed=seed)
-    elif kind == "BA":
-        if n is None or m is None:
-            raise ValueError("BA graph requires --n and --m")
-        G = nx.barabasi_albert_graph(n, m, seed=seed)
-    elif kind == "REG":
-        if n is None or d is None:
-            raise ValueError("REG graph requires --n and --d")
-        G = nx.random_regular_graph(d, n, seed=seed)
-    elif kind == "GRID":
-        if rows is None or cols is None:
-            raise ValueError("GRID graph requires --rows and --cols")
-        G = nx.grid_2d_graph(rows, cols)
-    else:
-        raise ValueError(f"Unsupported graph kind: {kind}")
-    return relabel_consecutive(G)
-
-
-def graph_id(
-    kind: str,
-    n: int | None = None,
-    p: float | None = None,
-    m: int | None = None,
-    d: int | None = None,
-    rows: int | None = None,
-    cols: int | None = None,
-) -> str:
-    """
-    Generate a human-readable graph identifier string.
-
-    Parameters
-    ----------
-    kind : str
-        Graph family: 'ER', 'BA', 'REG', or 'GRID'.
-    n : int, optional
-        Number of nodes.
-    p : float, optional
-        Edge probability (ER).
-    m : int, optional
-        BA parameter.
-    d : int, optional
-        Degree (REG).
-    rows : int, optional
-        Grid rows.
-    cols : int, optional
-        Grid columns.
-
-    Returns
-    -------
-    str
-        Graph identifier string like 'ER_n100_p0.050' or 'GRID_10x10'.
-    """
-    kind = kind.upper()
-    if kind == "ER":
-        return f"ER_n{n}_p{p:.3f}"
-    if kind == "BA":
-        return f"BA_n{n}_m{m}"
-    if kind == "REG":
-        return f"REG_n{n}_d{d}"
-    if kind == "GRID":
-        return f"GRID_{rows}x{cols}"
-    return kind
-
-
-def laplacian_eigenvalues(G: nx.Graph) -> np.ndarray:
-    """
-    Compute Laplacian eigenvalues of a graph.
-
-    Parameters
-    ----------
-    G : nx.Graph
-        Input graph.
-
-    Returns
-    -------
-    np.ndarray
-        Sorted array of Laplacian eigenvalues.
-    """
-    L = nx.laplacian_matrix(G).toarray()
-    return np.linalg.eigvalsh(L)
-
-
-def compute_s_true(q: float, lambdas: np.ndarray) -> float:
-    """
-    Compute exact s(q) from eigenvalues.
-
-    Parameters
-    ----------
-    q : float
-        Temperature parameter.
-    lambdas : np.ndarray
-        Laplacian eigenvalues.
-
-    Returns
-    -------
-    float
-        s(q) = sum(q / (q + lambda_i)).
-    """
-    return float(np.sum(q / (q + lambdas)))
-
-
-def compute_bin_widths(lam_grid: np.ndarray) -> np.ndarray:
-    """
-    Compute bin widths around grid points using mid-edge differences.
-
-    The first and last widths are extrapolated by half-intervals to
-    ensure proper normalization.
-
-    Parameters
-    ----------
-    lam_grid : np.ndarray
-        1D array of lambda grid points.
-
-    Returns
-    -------
-    np.ndarray
-        Array of bin widths, same length as lam_grid.
-    """
-    lam_grid = np.asarray(lam_grid, dtype=float)
-    assert lam_grid.ndim == 1 and lam_grid.size >= 2
-    mids = 0.5 * (lam_grid[1:] + lam_grid[:-1])
-    left_edge = max(0.0, lam_grid[0] - (mids[0] - lam_grid[0]))
-    right_edge = lam_grid[-1] + (lam_grid[-1] - mids[-1])
-    edges = np.concatenate([[left_edge], mids, [right_edge]])
-    widths = np.diff(edges)
-    widths[widths <= 0] = np.min(widths[widths > 0])
-    return widths
-
-
-def build_second_difference_matrix(m: int) -> np.ndarray:
-    """
-    Build second-difference matrix for smoothness regularization.
-
-    Parameters
-    ----------
-    m : int
-        Size of the density vector.
-
-    Returns
-    -------
-    np.ndarray
-        Second-difference matrix of shape (m-2, m).
-    """
-    if m < 3:
-        return np.zeros((0, m))
-    D = np.zeros((m - 2, m))
-    for i in range(m - 2):
-        D[i, i] = 1.0
-        D[i, i + 1] = -2.0
-        D[i, i + 2] = 1.0
-    return D
 
 
 # ============================================================================
@@ -348,46 +134,32 @@ def sample_s(
     rprint(f"[bold cyan]Graph:[/bold cyan] {gid}")
     rprint(f"  Nodes: {G.number_of_nodes()}, Edges: {G.number_of_edges()}")
 
-    # Optionally compute eigenvalues
+    # Compute eigenvalues once and cache
     lambdas = None
     if not skip_theory:
         try:
-            rprint("[yellow]Computing eigenvalues...[/yellow]")
+            rprint("[yellow]Computing eigenvalues (once)...[/yellow]")
             lambdas = laplacian_eigenvalues(G)
         except Exception as e:
             rprint(f"[red]Warning:[/red] could not compute eigenvalues ({e})")
             lambdas = None
 
-    # Sample s(q) across q-grid
+    # Sample s(q) across q-grid in parallel
     q_grid = np.logspace(math.log10(q_min), math.log10(q_max), num_q)
-    rprint(f"[yellow]Sampling s(q) for {num_q} q-values...[/yellow]")
+    rprint(f"[yellow]Sampling s(q) for {num_q} q-values (parallel)...[/yellow]")
 
-    records: list[dict[str, float]] = []
-    for q in q_grid:
-        wil = Wilson(q=float(q), random_state=seed)
-        wil.fit(G)
-        num_roots = np.empty(samples_per_q, dtype=float)
-        for i in range(samples_per_q):
-            s = None if seed is None else seed + i
-            _, roots = wil.sample(seed=s)
-            num_roots[i] = len(roots)
-        s_mean = float(num_roots.mean())
-        s_se = (
-            float(num_roots.std(ddof=1) / math.sqrt(samples_per_q))
-            if samples_per_q > 1
-            else 0.0
+    # Parallel execution with cached eigenvalues
+    records = Parallel(n_jobs=-1, backend="loky")(
+        delayed(sample_wilson_for_q)(
+            q=float(q),
+            G=G,
+            samples_per_q=samples_per_q,
+            seed=seed,
+            lambdas=lambdas,
+            compute_theory=(lambdas is not None),
         )
-        rec: dict[str, float] = {
-            "q": float(q),
-            "s_mc": s_mean,
-            "s_mc_se": s_se,
-            "g_mc": s_mean / float(q),
-        }
-        if lambdas is not None:
-            s_true = compute_s_true(float(q), lambdas)
-            rec["s_true"] = s_true
-            rec["g_true"] = s_true / float(q)
-        records.append(rec)
+        for q in q_grid
+    )
 
     df = pd.DataFrame.from_records(records).sort_values("q").reset_index(drop=True)
     csv_path = out_dir / "s_vs_q.csv"
@@ -438,129 +210,6 @@ def sample_s(
 # ============================================================================
 # Subcommand 2: reconstruct
 # ============================================================================
-
-
-def invert_stieltjes_density(
-    q: np.ndarray,
-    g: np.ndarray,
-    g_se: np.ndarray | None,
-    lam_grid: np.ndarray,
-    delta_lam: np.ndarray,
-    n_nodes: float,
-    mass_target: float,
-    gamma_mass: float,
-    tau_smooth: float,
-    tau_tv: float,
-    tv_iters: int,
-    tv_eps: float,
-) -> tuple[np.ndarray, float]:
-    """
-    Recover spectral density ρ(λ) from g(q) measurements via regularized inversion.
-
-    This function solves a nonnegative Tikhonov-regularized least-squares problem
-    to recover the spectral density from Stieltjes transform measurements.
-
-    Parameters
-    ----------
-    q : np.ndarray
-        Array of q values where g(q) was measured.
-    g : np.ndarray
-        Measured g(q) = s(q)/q values.
-    g_se : np.ndarray or None
-        Standard errors for g measurements (for heteroscedastic weighting).
-    lam_grid : np.ndarray
-        Lambda grid for discretized density.
-    delta_lam : np.ndarray
-        Bin widths for lambda grid.
-    n_nodes : float
-        Number of nodes in the graph.
-    mass_target : float
-        Target total probability mass (usually 1.0).
-    gamma_mass : float
-        Penalty strength for mass constraint.
-    tau_smooth : float
-        L2 smoothness regularization strength.
-    tau_tv : float
-        Total variation regularization strength (IRLS).
-    tv_iters : int
-        Number of IRLS iterations for TV regularization.
-    tv_eps : float
-        TV epsilon for Huber-like approximation.
-
-    Returns
-    -------
-    rho_hat : np.ndarray
-        Recovered spectral density on lam_grid.
-    rrmse : float
-        Relative RMSE between fitted and measured g(q).
-
-    Notes
-    -----
-    The discretization assumes g ≈ n * A ρ where A_{jl} = Δλ_l / (q_j + λ_l).
-    The objective includes:
-    - Weighted least squares fit to g(q)
-    - Mass penalty to enforce ∫ ρ dλ = mass_target
-    - L2 smoothness on second differences
-    - Optional TV regularization via IRLS
-    """
-    J = q.shape[0]
-    M = lam_grid.shape[0]
-    # Data matrix in density mode
-    A_data = (delta_lam.reshape(1, M)) / (q.reshape(J, 1) + lam_grid.reshape(1, M))
-    A_data *= float(n_nodes)
-    b_data = g.reshape(J)
-
-    # Optional heteroscedastic weighting
-    if g_se is not None:
-        w = 1.0 / (np.maximum(g_se.reshape(J), 1e-12) ** 2)
-        wsqrt = np.sqrt(w)
-        A_data = (wsqrt.reshape(J, 1)) * A_data
-        b_data = wsqrt * b_data
-
-    # Mass penalty row
-    A_mass = math.sqrt(gamma_mass) * delta_lam.reshape(1, M)
-    b_mass = np.array([math.sqrt(gamma_mass) * float(mass_target)], dtype=float)
-
-    # L2 smoothness rows
-    D2 = build_second_difference_matrix(M)
-    A_smooth = math.sqrt(max(tau_smooth, 0.0)) * D2
-    b_smooth = np.zeros(A_smooth.shape[0], dtype=float)
-
-    # Initial solution without TV
-    A_stack = np.vstack([A_data, A_mass, A_smooth])
-    b_stack = np.concatenate([b_data, b_mass, b_smooth])
-    res = lsq_linear(
-        A_stack, b_stack, bounds=(0.0, np.inf), method="trf", lsmr_tol="auto", verbose=0
-    )
-    rho = np.maximum(res.x, 0.0)
-
-    # TV via IRLS if requested
-    tau_tv = float(max(tau_tv, 0.0))
-    if tau_tv > 0.0 and D2.shape[0] > 0:
-        for _ in range(int(tv_iters)):
-            diff = D2 @ rho
-            w_tv = 1.0 / np.sqrt(diff * diff + tv_eps * tv_eps)
-            A_tv = math.sqrt(tau_tv) * (w_tv.reshape(-1, 1) * D2)
-            b_tv = np.zeros(A_tv.shape[0], dtype=float)
-            A_stack = np.vstack([A_data, A_mass, A_smooth, A_tv])
-            b_stack = np.concatenate([b_data, b_mass, b_smooth, b_tv])
-            res = lsq_linear(
-                A_stack,
-                b_stack,
-                bounds=(0.0, np.inf),
-                method="trf",
-                lsmr_tol="auto",
-                verbose=0,
-            )
-            rho = np.maximum(res.x, 0.0)
-
-    # Relative RMSE in unweighted space
-    g_pred = (
-        float(n_nodes)
-        * (delta_lam.reshape(1, M) / (q.reshape(J, 1) + lam_grid.reshape(1, M)))
-    ) @ rho
-    rrmse = float(np.linalg.norm(g_pred - g) / (np.linalg.norm(g) + 1e-12))
-    return rho, rrmse
 
 
 @app.command()
@@ -717,26 +366,27 @@ def reconstruct(
         rprint(f"[yellow]Loading s(q) data from {csv_path}...[/yellow]")
         s_df = pd.read_csv(csv_path)
     elif compute_s:
-        rprint("[yellow]Computing s(q) from scratch...[/yellow]")
+        rprint("[yellow]Computing s(q) from scratch (parallel)...[/yellow]")
         q_grid = np.logspace(math.log10(q_min), math.log10(q_max), num_q)
-        records: list[dict[str, float]] = []
-        for q in q_grid:
-            wil = Wilson(q=float(q), random_state=seed)
-            wil.fit(G)
-            s_vals = []
-            for i in range(samples_per_q):
-                s = None if seed is None else seed + i
-                _, roots = wil.sample(seed=s)
-                s_vals.append(len(roots))
-            s_vals = np.asarray(s_vals, dtype=float)
-            rec: dict[str, float] = {
-                "q": float(q),
-                "s_mc": float(s_vals.mean()),
-                "s_mc_se": float(s_vals.std(ddof=1) / math.sqrt(len(s_vals)))
-                if len(s_vals) > 1
-                else 0.0,
-            }
-            records.append(rec)
+
+        # Compute eigenvalues once for efficiency
+        try:
+            lambdas_for_s = laplacian_eigenvalues(G)
+        except Exception:
+            lambdas_for_s = None
+
+        # Parallel execution
+        records = Parallel(n_jobs=-1, backend="loky")(
+            delayed(sample_wilson_for_q)(
+                q=float(q),
+                G=G,
+                samples_per_q=samples_per_q,
+                seed=seed,
+                lambdas=lambdas_for_s,
+                compute_theory=False,
+            )
+            for q in q_grid
+        )
         s_df = (
             pd.DataFrame.from_records(records).sort_values("q").reset_index(drop=True)
         )
@@ -919,8 +569,6 @@ def reconstruct(
         try:
             rprint(f"[yellow]Computing KDE (normalize={kde_normalize})...[/yellow]")
             # Use seaborn's kdeplot with explicit normalization control
-            lam_kde = np.linspace(lam_grid[0], lam_grid[-1], 1000)
-            # Compute KDE density estimates
             kde_data = pd.DataFrame({"lambda": lambdas})
             sns.kdeplot(
                 data=kde_data,
@@ -952,111 +600,6 @@ def reconstruct(
 # ============================================================================
 # Subcommand 3: validate
 # ============================================================================
-
-
-def heat_trace_from_spectrum(beta: np.ndarray, lambdas: np.ndarray) -> np.ndarray:
-    """
-    Compute heat trace Z(β) from eigenvalues.
-
-    Parameters
-    ----------
-    beta : np.ndarray
-        Array of inverse temperature values.
-    lambdas : np.ndarray
-        Laplacian eigenvalues.
-
-    Returns
-    -------
-    np.ndarray
-        Z(β) = sum_i exp(-β λ_i) for each β.
-    """
-    beta = np.asarray(beta, dtype=float)
-    lambdas = np.asarray(lambdas, dtype=float)
-    return np.exp(-np.outer(beta, lambdas)).sum(axis=1)
-
-
-def s_from_spectrum(q: np.ndarray, lambdas: np.ndarray) -> np.ndarray:
-    """
-    Compute s(q) from eigenvalues.
-
-    Parameters
-    ----------
-    q : np.ndarray
-        Array of q values.
-    lambdas : np.ndarray
-        Laplacian eigenvalues.
-
-    Returns
-    -------
-    np.ndarray
-        s(q) = sum_i q / (q + λ_i) for each q.
-    """
-    q = np.asarray(q, dtype=float)
-    lambdas = np.asarray(lambdas, dtype=float)
-    return (q[:, None] / (q[:, None] + lambdas[None, :])).sum(axis=1)
-
-
-def s_from_Z_via_gauss_laguerre(
-    q: np.ndarray, lambdas: np.ndarray, n_nodes: int
-) -> np.ndarray:
-    """
-    Compute s(q) from heat trace Z(β) via Gauss-Laguerre quadrature.
-
-    Uses the Laplace transform identity: s(q) = ∫_0^∞ e^{-t} Z(β t) dt with β = 1/q.
-
-    Parameters
-    ----------
-    q : np.ndarray
-        Array of q values.
-    lambdas : np.ndarray
-        Laplacian eigenvalues.
-    n_nodes : int
-        Number of quadrature nodes.
-
-    Returns
-    -------
-    np.ndarray
-        s(q) computed via numerical integration.
-    """
-    t_nodes, w_nodes = laggauss(n_nodes)
-    s_vals = []
-    for qi in q:
-        beta = 1.0 / float(qi)
-        Z_vals = np.exp(-np.outer(beta * t_nodes, lambdas)).sum(axis=1)
-        s_vals.append(float(w_nodes @ Z_vals))
-    return np.asarray(s_vals)
-
-
-def estimate_s_via_wilson(
-    G: nx.Graph, q: float, n_samples: int, random_state: int
-) -> tuple[float, float]:
-    """
-    Estimate s(q) via Wilson Monte Carlo sampling.
-
-    Parameters
-    ----------
-    G : nx.Graph
-        Input graph.
-    q : float
-        Temperature parameter.
-    n_samples : int
-        Number of Monte Carlo samples.
-    random_state : int
-        Random seed.
-
-    Returns
-    -------
-    mean : float
-        Mean number of roots (estimate of s(q)).
-    sem : float
-        Standard error of the mean.
-    """
-    est = Wilson(q=q, random_state=random_state).fit(G)
-    samples = est.transform(n_samples=n_samples, seed=random_state)
-    root_counts = np.array([len(roots) for (_, roots) in samples], dtype=float)
-    mean = float(root_counts.mean())
-    sem = float(root_counts.std(ddof=1) / math.sqrt(max(1, n_samples)))
-    return mean, sem
 
 
 @app.command()
@@ -1198,16 +741,18 @@ def validate(
         )
         s_quad = s_from_Z_via_gauss_laguerre(q_values, lambdas, n_nodes=gl_nodes)
 
-        # Wilson Monte Carlo
+        # Wilson Monte Carlo (parallel with cached eigenvalues)
         rprint(
-            f"[yellow]  Estimating s via Wilson MC ({n_wilson_samples} samples)...[/yellow]"
+            f"[yellow]  Estimating s via Wilson MC ({n_wilson_samples} samples, parallel)...[/yellow]"
         )
-        s_mc_mean = np.zeros_like(q_values)
-        s_mc_sem = np.zeros_like(q_values)
-        for i, q in enumerate(q_values):
-            mean, sem = estimate_s_via_wilson(G, float(q), n_wilson_samples, seed + i)
-            s_mc_mean[i] = mean
-            s_mc_sem[i] = sem
+        results = Parallel(n_jobs=-1, backend="loky")(
+            delayed(estimate_s_for_validate)(
+                G, float(q), n_wilson_samples, seed + i, lambdas
+            )
+            for i, q in enumerate(q_values)
+        )
+        s_mc_mean = np.array([r[0] for r in results])
+        s_mc_sem = np.array([r[1] for r in results])
 
         # Report errors
         rel_err_quad = np.linalg.norm(s_quad - s_spec) / max(
@@ -1219,7 +764,7 @@ def validate(
         rprint(f"  [green]rel error s_from_Z (GL):[/green] {rel_err_quad:.3e}")
         rprint(f"  [green]rel error s Wilson MC:[/green] {rel_err_mc:.3e}")
 
-        # Plot s(q)
+        # Plot s(q) validation
         fig, ax = plt.subplots(figsize=(8, 5))
         ax.semilogx(q_values, s_spec, label="spectral s(q)", color="#1f77b4", lw=1)
         ax.semilogx(
@@ -1245,69 +790,16 @@ def validate(
         ax.set_ylabel("s(q) = E[#roots]")
         ax.set_title(f"s(q) validation — {name}")
         ax.legend(frameon=True)
-        fig.tight_layout()
-        fname = out_path / f"validation_s_vs_q_{name}.pdf"
-        fig.savefig(fname, dpi=200, bbox_inches="tight")
-        plt.close(fig)
-        rprint(f"  [green]✓[/green] Saved: {fname}")
+        save_plot_both_formats(fig, out_path, f"validation_s_vs_q_{name}")
 
-        # Also save PNG
-        fig, ax = plt.subplots(figsize=(8, 5))
-        ax.semilogx(q_values, s_spec, label="spectral s(q)", color="#1f77b4", lw=1)
-        ax.semilogx(
-            q_values,
-            s_quad,
-            label="from Z via Gauss-Laguerre",
-            color="#2ca02c",
-            lw=1,
-            ls="--",
-        )
-        ax.errorbar(
-            q_values,
-            s_mc_mean,
-            yerr=s_mc_sem,
-            fmt="o",
-            color="#d62728",
-            ecolor="#ff9896",
-            elinewidth=1.0,
-            capsize=3,
-            label="Wilson MC",
-        )
-        ax.set_xlabel("q")
-        ax.set_ylabel("s(q) = E[#roots]")
-        ax.set_title(f"s(q) validation — {name}")
-        ax.legend(frameon=True)
-        fig.tight_layout()
-        fname_png = out_path / f"validation_s_vs_q_{name}.png"
-        fig.savefig(fname_png, dpi=200, bbox_inches="tight")
-        plt.close(fig)
-        rprint(f"  [green]✓[/green] Saved: {fname_png}")
-
-        # Plot Z(β)
+        # Plot Z(β) heat trace
         fig, ax = plt.subplots(figsize=(8, 5))
         ax.semilogx(beta_values, Z_spec, label="spectral Z(β)", color="#1f77b4", lw=1)
         ax.set_xlabel("β")
         ax.set_ylabel("Z(β) = Tr e^{-βL}")
         ax.set_title(f"Heat trace — {name}")
         ax.legend(frameon=True)
-        fig.tight_layout()
-        fname = out_path / f"validation_Z_vs_beta_{name}.pdf"
-        fig.savefig(fname, dpi=200, bbox_inches="tight")
-        plt.close(fig)
-        rprint(f"  [green]✓[/green] Saved: {fname}")
-
-        # Also save PNG
-        fig, ax = plt.subplots(figsize=(8, 5))
-        ax.semilogx(beta_values, Z_spec, label="spectral Z(β)", color="#1f77b4", lw=1)
-        ax.set_xlabel("β")
-        ax.set_ylabel("Z(β) = Tr e^{-βL}")
-        ax.set_title(f"Heat trace — {name}")
-        ax.legend(frameon=True)
-        fig.tight_layout()
-        fname_png = out_path / f"validation_Z_vs_beta_{name}.png"
-        fig.savefig(fname_png, dpi=200, bbox_inches="tight")
-        plt.close(fig)
-        rprint(f"  [green]✓[/green] Saved: {fname_png}")
+        save_plot_both_formats(fig, out_path, f"validation_Z_vs_beta_{name}")
 
     rprint(f"\n[bold green]✓ All figures saved to {out_path}[/bold green]")
 

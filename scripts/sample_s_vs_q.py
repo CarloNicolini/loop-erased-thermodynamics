@@ -3,13 +3,6 @@
 Sample s(q) via Wilson's q-forest sampler across a grid of q values and
 store results as CSV plus a validation plot.
 
-⚠️  DEPRECATION NOTICE ⚠️
-This script is deprecated. Please use the unified CLI instead:
-
-  python -m wilson.cli sample-s --graph ER --n 100 --p 0.05
-
-See: docs/CLI_USAGE.md for full documentation.
-
 Usage example (activate env first):
 
   source .venv/bin/activate

@@ -11,7 +11,7 @@ Usage example:
 
   source .venv/bin/activate
   python scripts/sample_s_vs_q.py --graph ER --n 100 --p 0.05 --seed 42
-  python scripts/reconstruct_spectrum.py --graph ER --n 100 --p 0.05 --seed 42
+  python scripts/reconstruct_spectrum.py --graph ER --n 100 --p 0.05 --seed 42 --compute_theory --use-theory-g
 
 If s_vs_q.csv is not present, this script can compute s(q) directly as well
 with --compute-s.
@@ -21,7 +21,6 @@ import argparse
 import math
 import os
 from pathlib import Path
-import sys
 import warnings
 
 import matplotlib.pyplot as plt
@@ -31,12 +30,6 @@ import pandas as pd
 import seaborn as sns
 from scipy.optimize import lsq_linear
 from scipy.stats import gaussian_kde
-
-# Ensure we can import from src/
-ROOT = Path(__file__).resolve().parents[1]
-SRC = ROOT / "src"
-if str(SRC) not in sys.path:
-    sys.path.insert(0, str(SRC))
 
 from wilson.wilson import Wilson  # noqa: E402
 

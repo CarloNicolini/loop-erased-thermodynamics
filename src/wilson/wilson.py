@@ -22,6 +22,9 @@ class Wilson:
         use the WilsonQ variant that attaches an extra root with weight q.
     random_state : int or None
         Seed for reproducibility.
+    eigenvalues : np.ndarray or None
+        Precomputed Laplacian eigenvalues. If provided, avoids recomputation
+        during fit(). Performance optimization for repeated fitting with same graph.
 
     Notes
     -----
@@ -31,9 +34,15 @@ class Wilson:
     - ``s_``: (only when q is not None) value of sum(q / (q + lambda_i))
     """
 
-    def __init__(self, q: Optional[float] = None, random_state: Optional[int] = None):
+    def __init__(
+        self,
+        q: Optional[float] = None,
+        random_state: Optional[int] = None,
+        eigenvalues: Optional[np.ndarray] = None,
+    ):
         self.q = q
         self.random_state = random_state
+        self.eigenvalues = eigenvalues
         # attributes set in fit
         self.G_ = None
         self.nv_ = None
@@ -54,8 +63,12 @@ class Wilson:
         # prepare RNG
         self._rng = np.random.RandomState(self.random_state)
         if self.q is not None:
-            L = nx.laplacian_matrix(G).toarray()
-            lambdai = np.linalg.eigvalsh(L)
+            # Use precomputed eigenvalues if available
+            if self.eigenvalues is not None:
+                lambdai = self.eigenvalues
+            else:
+                L = nx.laplacian_matrix(G).toarray()
+                lambdai = np.linalg.eigvalsh(L)
             # s = sum(q / (q + lambda_i))
             self.s_ = float(np.sum(self.q / (self.q + lambdai)))
         else:

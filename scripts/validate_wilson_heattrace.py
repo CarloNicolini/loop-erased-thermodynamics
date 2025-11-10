@@ -1,13 +1,6 @@
 #!/usr/bin/env python3
 """Validate forest-heat-kernel identities via Wilson sampling.
 
-⚠️  DEPRECATION NOTICE ⚠️
-This script is deprecated. Please use the unified CLI instead:
-
-  python -m wilson.cli validate
-
-See: docs/CLI_USAGE.md for full documentation.
-
 This script:
 - Builds several graph ensembles (ER, BA, Grid, Regular)
 - Computes spectral heat trace Z(β) and spectral s(q) = Σ q/(q+λ_i)
