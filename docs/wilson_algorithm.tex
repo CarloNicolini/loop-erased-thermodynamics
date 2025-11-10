@@ -1,49 +1,30 @@
 \begin{algorithm}[htb]
     \SetAlgoLined
     \DontPrintSemicolon
-    \KwInput{$G = (V, E, w)$ a (possibly weighted) undirected graph; optional root weight $q \ge 0$.}
+    \KwInput{$G = (V,E,w)$ a weighted undirected graph; optional root weight $q \ge 0$.}
     \KwOutput{$F$ a random spanning forest; $\mathcal{R}$ the set of roots.}
     
     \BlankLine
     \If{$q > 0$}{
-        Add an auxiliary root node $r$ to $V$\;
-        \For{each $v \in V \setminus \{r\}$}{
-            Add directed edge $(v, r)$ with weight $q$ to $G$\;
-        }
+      Add auxiliary root $r$ and edges $(v,r)$ of weight $q$ for all $v \in V$\;
     }
-    
-    Initialize all vertices as \texttt{Intree[v]} $\leftarrow$ \textbf{False}\;
-    Initialize \texttt{Next[v]} undefined for all $v \in V$\;
-    Choose arbitrary root $r$ (the auxiliary one if $q > 0$, otherwise any vertex)\;
-    \texttt{Intree[r]} $\leftarrow$ \textbf{True}\;
-    $\mathcal{R} \leftarrow \{r\}$, $F \leftarrow \emptyset$\;
+    Choose root $r$ (auxiliary if $q>0$, otherwise arbitrary)\;
+    Initialize forest $F \leftarrow \emptyset$, root set $\mathcal{R} \leftarrow \{r\}$\;
+    Mark all vertices as unvisited\;
     
     \BlankLine
-    \For{each vertex $v \in V \setminus \{r\}$ in random order}{
-        $u \leftarrow v$\;
-        \While{\texttt{Intree[$u$]} = \textbf{False}}{
-            Select a random neighbor $w$ of $u$ with probability proportional to $w(u,w)$\;
-            \texttt{Next[$u$]} $\leftarrow w$\;
-            $u \leftarrow w$\;
-        }
-        $u \leftarrow v$\;
-        \While{\texttt{Intree[$u$]} = \textbf{False}}{
-            \texttt{Intree[$u$]} $\leftarrow$ \textbf{True}\;
-            $u \leftarrow$ \texttt{Next[$u$]}\;
-        }
+    \For{each unvisited vertex $v$ in random order}{
+      Perform a random walk from $v$ until it reaches a visited node,
+      choosing neighbors with probability $\propto w(u,w)$\;
+      Erase loops from the walk to obtain a simple path $P$\;
+      Add $P$ to $F$ and mark its vertices as visited\;
     }
     
     \BlankLine
-    \For{each $v \in V \setminus \{r\}$}{
-        \If{\texttt{Next[$v$]} is defined and \texttt{Next[$v$]} $\neq r$}{
-            Add edge $(v, \texttt{Next[$v$]})$ to $F$\;
-        }
-        \ElseIf{\texttt{Next[$v$]} = r}{
-            $\mathcal{R} \leftarrow \mathcal{R} \cup \{v\}$\;
-        }
+    \If{$q > 0$}{
+      Let $\mathcal{R}$ be all vertices directly linked to the auxiliary root\;
     }
-    
     \Return{$(F, \mathcal{R})$}
-    \caption{Wilson’s Algorithm for Sampling Random Rooted Forests}
+    \caption{Random Rooted Forest Sampling (Wilson $q$-algorithm)}
     \label{alg:wilson}
     \end{algorithm}

@@ -1,4 +1,4 @@
-\documentclass[10pt,aps,pre,twocolumn,nofootinbib,superscriptaddress,longbibliography]{revtex4-1}
+\documentclass[10pt,aps,pre,twocolumn,nofootinbib,superscriptaddress,longbibliography]{revtex4-2}
 \usepackage[colorinlistoftodos,textsize=tiny]{todonotes}
 \usepackage[english]{babel}
 \usepackage[utf8x]{inputenc}
@@ -10,7 +10,7 @@
 \usepackage{natbib}
 \usepackage{microtype}
 \usepackage{graphicx}
-\usepackage{mathpazo}
+%\usepackage{mathpazo}
 \usepackage{cleveref}
 %\usepackage[labelformat = empty,position=top]{subcaption}
 \usepackage{pgfplots}
@@ -70,10 +70,7 @@
 \date{\today}
 
 \begin{abstract}
-In this work we deduce a novel interpretation of the Boltzmann partition function within the framework of spectral entropies, in terms of the statistics of random spanning forests. 
-We exploit the sampling method provided by the Wilson algorithm to sample random spanning forest with a temperature parameter $q$ and show that this parameter can be set as the inverse normalized diffusion time of the random walker describing a diffusion process on the network.
-This analogy makes it possible to decompose the Boltzmann partition function in the high temperature limit as the contribution of rooted random spanning forests, whose trees are relatively small.
-This study casts one the first bridges between the statistics of rooted random spanning forests and randomized algorithms to sample from their probability distribution, and the statistical mechanics of complex networks, paving the way to a sound and rigorous network information theory.
+We develop a unified framework that links the thermodynamics of diffusion on networks to the combinatorics of random spanning forests. The central idea is that statistics of rooted forests encode the same information carried by the heat kernel, enabling partition functions and other thermodynamic observables to be recovered directly from forest samples. Leveraging Wilson’s algorithm, we obtain near-linear–time estimators that avoid eigendecompositions and remain accurate across temperatures. The theory clarifies limiting regimes: at high temperature, thermodynamic expansions correspond to forests composed of small trees; at low temperature, the measure concentrates on tree-like configurations. We validate the approach on Erd\H{o}s--R\'enyi, Barab\'asi--Albert, grid, and regular graphs, finding close agreement between Monte Carlo estimates and analytic predictions. Beyond offering a conceptual bridge between loop-erased random walks and heat-kernel methods, the framework provides practical tools for large-scale network analysis, enabling robust estimation of partition functions, energy, and Von Neumann entropy and principled comparisons between graph ensembles. These results establish random spanning forests as an operational link between combinatorial structure and statistical mechanics on complex networks.
 \end{abstract}
 \maketitle
 
@@ -87,17 +84,17 @@ We show that key thermodynamic quantities of the heat kernel are linked, through
 In particular, the expected number of roots $s(q)=\sum_i \tfrac{q}{q+\lambda_i}$ (with $\{\lambda_i\}$ the Laplacian spectrum) is the Laplace transform in $q$ of the heat trace $Z$, and the rooted-forest partition function $\chi(q)=\det(q\bI+\bL)$ admits a Frullani representation involving $Z$~\cite{frullani1830sopra}. 
 These relations hold for all $\beta,q>0$ and provide operational estimators of thermodynamic observables via forest sampling, avoiding explicit eigendecompositions.
 
-Beyond these analytic identities, we clarify the role of graph zeta functions. 
-The classical Ihara-Bass determinant involves the adjacency and degree matrices and encodes non-backtracking cycles.
-We prove that, for $d$-regular graphs, the Ihara reciprocal reduces exactly to the forest partition function under a rational change of variables, $Z_G(u)^{-1}=(1-u^2)^{m-n}\,u^n\,\chi \left(\frac{\alpha(u)}{u}\right)$ with $\alpha(u)=1-du+(d-1)u^2$.
+% Beyond these analytic identities, we clarify the role of graph zeta functions. 
+% The classical Ihara-Bass determinant involves the adjacency and degree matrices and encodes non-backtracking cycles.
+% We prove that, for $d$-regular graphs, the Ihara reciprocal reduces exactly to the forest partition function under a rational change of variables, $Z_G(u)^{-1}=(1-u^2)^{m-n}\,u^n\,\chi \left(\frac{\alpha(u)}{u}\right)$ with $\alpha(u)=1-du+(d-1)u^2$.
 
-This pins down when the combinatorics of forests alone suffices to represent a zeta determinant and clarifies connections to polynomial thermodynamic characterizations proposed in the literature~\cite{ye2015}.
+% This pins down when the combinatorics of forests alone suffices to represent a zeta determinant and clarifies connections to polynomial thermodynamic characterizations proposed in the literature~\cite{ye2015}.
 
 Practically, the bridge between forests and heat diffusion yields scalable estimators.
 Wilson's algorithm samples forests in near-linear time on sparse graphs; empirical averages of root counts at a few $q$ values recover the heat trace through Laplace inversion or directly approximate $\log\chi(q)$ via quadrature. 
 In the high-temperature limit, the usual moment expansions of $Z(\beta)$ re-emerge, but our transforms remain valid across temperatures, enabling accurate thermodynamic evaluations without spectral computations.
 
-We derive exact integral identities linking $s(q)$ and $\log\chi(q)$ to the heat trace $Z(\beta)$, unifying forest combinatorics and thermodynamics; establish and validate the regular-graph reduction from the Ihara-Bass determinant to the rooted-forest partition function; provide scalable estimators of $Z$, energy, and Von Neumann entropy via Wilson sampling, with accuracy validated on ER, BA, grid and regular graphs.
+We derive exact integral identities linking $s(q)$ and $\log\chi(q)$ to the heat trace $Z(\beta)$, unifying forest combinatorics with thermodynamics and provide scalable estimators of $Z$, energy, and Von Neumann entropy via Wilson sampling, with accuracy validated on ER, BA, grid and regular graphs.
 
 We finally discuss thermodynamic implications and computational estimators, and conclude with validations and perspectives for weighted/directed graphs and large-scale applications.
 
@@ -129,7 +126,7 @@ The denominator $\chi(q)$ is a normalization factor. It represents the ``partiti
 \chi(q) = \sum_{\phi \in \mathcal{F}} w(\phi) q^{|\mathcal{R}(\phi)|}.
 \end{equation}
 A classical result in graph theory is the Kirchhoff matrix-tree theorem~\cite{lyons2017probability,avena2018,avena2018a}, stating that the number of uniform spanning trees of a graph is specified by the determinant of the minors of the corresponding combinatorial Laplacian $\bL$, or equivalently equals the product of non-zero eigenvalues of $\bL$.
-By evoking a variation of the Markov matrix-tree theorem~\cite{avena2018a}, and the properties of the determinant, the normalization factor $\chi(q)$ which is the characteristic polynomial of the $-\bL$, can be written as the determinant of the matrix $q\bI + \bL$:
+By evoking a variation of the Markov matrix-tree theorem~\cite{avena2018a}, and the properties of the determinant, the normalization factor $\chi(q)$ which is the characteristic polynomial of the Laplacian, can be written as the determinant of the matrix $q\bI + \bL$:
 \begin{equation}\label{eq:chi_partition_function}
 \chi(q) = \det(q\bI + \bL) = \prod_{i=1}^{n}(q+\lambda_i).
 \end{equation}
@@ -151,32 +148,40 @@ On one hand, this parameter is deterministically coupled to the eigenvalues of t
 
 It is intuitively simple to see that in the limit $q\to 0$ the random variable $\Phi_q$ describes a random spanning tree on $n$ nodes with exactly $n-1$ links. In the large $q$ limit instead one obtains a degenerate forest with $n$ trees but no links~\cite{avena2018}.
 
+When viewed in terms of the spectral determinant the quantity $\chi(q)=\det(q\bI+\bL)$, serves as a generating polynomial for rooted forests~\cite{chebotarev2002forest,chebotarev2006matrix}.
+The introduction of the parameter $q>0$ allows to exploit the spectral calculus to express it as a trace of a matrix logarithm:
+\begin{equation}
+\chi(q) = \det(q\bI + \bL) = e^{\Tr{\log\left(q\bI + \bL \right)}}.
+\end{equation}
+where here the logarithm is the matrix functional $\log(\cdot)$.
+The resolvent identity gives:
+\begin{equation}
+\frac{d}{dq}\log\chi(q) = \Tr{(q\bI+\bL)^{-1}} = \sum_{i=1}^n \frac{1}{q+\lambda_i}.
+\end{equation}
+We now define the combinatorially meaningful function $s(q)$ as:
+\begin{equation}\label{eq:s_def}
+s(q) := q\frac{d}{dq}\log\chi(q) = \sum_{i=1}^n \frac{q}{q+\lambda_i}.
+\end{equation}
+
+\subsection{Sampling random spanning forests}
 There is an intriguing way to understand the role of $q$ in terms of loop-erased random walks on graphs.
 To see this, one can extend the graph $G$ obtaining an augmented graph $G'=(V',E',w')$ with an extra \emph{absorbing} vertex $r$ connected to every node in $V$ to $r$ with directed edges with weight $q$.
 Running a loop-erased random walk on the augmented graph defines a series of trajectories, all rooted in $r$.
 Then, in order to sample from the distribution in Eq.~\ref{eq:tree_probability}, one only has to remove the root node $r$ from the random spanning tree built on the augmented graph $G'$.
+
 This idea is at the basis of the Wilson algorithm, a simple yet efficient method to generate random spanning forest with distribution as in Eq.~\ref{eq:tree_probability}.
-This algorithm is of fundamental importance in the rest of this work, and it enables to cast a bridge between theory of continuous time random walks on graphs, spectral entropies framework and statistical mechanics.
+This algorithm enables to cast a bridge between theory of continuous time random walks on graphs, spectral entropies framework and statistical mechanics.
+It unifies spanning tree and forest sampling within a single stochastic process, linking discrete graph structures to continuous-time diffusion dynamics and spectral measures on graphs.
 
+Hence we can directly estimate the expected number of roots $s(q)$ from Wilson sampling by generating $k$ i.i.d. forests $\phi_j \sim \Phi_q$ and using the Monte Carlo estimator:
+\begin{equation}\label{eq:chi_est}
+s(q) = \mathbb{E}\bigl[|\mathcal{R}(\Phi_q)|\bigr] \approx \frac{1}{k} \sum_{j=1}^{k} |\mathcal{R}(\phi_j)|.
+\end{equation}
+By standard results on determinantal forest measures~\citep{hough2006determinantal,lyons2017probability,avena2018,avena2018a}, $s(q)$ equals the expected number of roots in the random forest $\Phi_q$.
+Thus $s(q)$ has a dual nature: it is both a smooth spectral statistic and a direct combinatorial observable sampled efficiently by Wilson's algorithm~\cite{wilson1996,propp1998}.
+
+Intuitively, $s(q)$ is extensive with $0\le s(q)\le n$, interpolating from spanning trees ($q\to 0$, few roots) to the edgeless forest ($q\to\infty$, $n$ roots).
 In the next section we focus on the graph-theoretic aspects of this kind of processes, and explore the tight relation between the combinatorial aspects of random rooted forests and the thermodynamics of heat diffusion in complex networks.
-
-\subsection{Sampling random spanning forests}
-The Wilson algorithm is a simple yet remarkably efficient procedure for sampling random spanning trees and rooted forests according to the probability distribution defined in Eq.~\ref{eq:tree_probability}.
-It plays a fundamental role in this work, providing an operational bridge between the theory of continuous-time random walks on graphs, the spectral entropy framework, and concepts from statistical mechanics.
-
-In its classical form, Wilson's algorithm generates a uniform spanning tree by iteratively performing loop-erased random walks on the underlying graph $G = (V, E, w)$.
-Starting from a designated root node, each vertex not yet in the tree performs a random walk until it first reaches a vertex already contained in the tree.
-Any loops formed during the walk are erased, and the resulting self-avoiding path is appended to the tree.
-This process continues until every vertex is included, yielding a random spanning tree distributed uniformly among all possible spanning trees of $G$.
-
-A natural generalization, often referred to as the Wilson–$q$ algorithm, extends this procedure to rooted forests.
-An auxiliary root node is introduced and connected to all other vertices with edges of weight $q > 0$.
-The same loop-erased random walk mechanism then produces a random forest in which each connected component has exactly one root, corresponding to the auxiliary root's neighbors.
-The resulting distribution assigns probability proportional to $P(F) \;\propto\; q^{|\mathcal{R}(F)|} \prod_{(i,j)\in F} w_{ij}$,
-where $|\mathcal{R}(F)|$ is the number of roots and $w_{ij}$ are the edge weights.
-This formulation unifies spanning tree and forest sampling within a single stochastic process, linking discrete graph structures to continuous-time diffusion dynamics and spectral measures on graphs.
-
-\input{wilson_algorithm}
 
 \section{Statistical mechanics of spectral maximum entropy model}
 The spectral entropies framework can be seen as an extension of the maximum entropy random graph model based on the Von Neumann entropy instead of the classical Shannon entropy.
@@ -185,179 +190,82 @@ As a result, by replacing the Shannon entropy with the Von Neumann entropy~\cite
 \begin{equation}\label{eq:vonneumann_entropy}
 S(\brho) = - \Tr{\brho \log \brho}
 \end{equation}
-and by constraining the associated Lagrangian problem to require the networks in the ensemble to have the same Laplacian matrix, on average, one finds that the role of classical probability is replaced by the density matrix $\brho$
+and by constraining the associated Lagrangian problem to require the networks in the ensemble to have the same Laplacian matrix, on average, one finds that the role of classical probability is replaced by the density matrix $\brho$:
+
 \begin{equation}\label{eq:density_matrix}
 \brho = \frac{e^{-\beta \bL}}{\Tr{e^{-\beta \bL}}}
 \end{equation}
-which describes the result of constraining the diffusion properties on the networks.
-Here $\beta$ is the Lagrangian multiplier pertaining to $\bL$, intimately tied to the Laplacian spectrum and, in particular, to the formal parameter $q$. We anticipate that setting $q=1/\beta$ highlights the relation between random spanning forests and the thermodynamics of the spectral entropies framework.
-In classical statistical mechanics $\beta$ represents an inverse temperature parameter, but it can also be seen as a normalized diffusion time~\cite{nicolini2018} on the network.
-Hence, the relation $q=1/\beta$ indicates that $q$ can be interpreted as a temperature, or equivalently as a time scale for the diffusion process~\cite{ghavasieh2020statistical}.
 
-\subsection{Spectral partition function}
-In the spectral entropies framework the Boltzmann partition function $Z(\beta)$ takes the form of a trace over the states described by the eigenvalues of $\bL$ weighted by a Boltzmann factor:
+which describes the result of constraining the diffusion properties on the networks~\cite{ghavasieh2020statistical,dedomenico2016b,nicolini2018}.
+Here $\beta$ is the Lagrangian multiplier pertaining to $\bL$: in classical statistical mechanics $\beta$ represents an inverse temperature parameter, but it can also be seen as a normalized diffusion time on the network.
+
+Connection to random forests. The normalized heat kernel $\brho(\beta)$ aggregates the same spectral information that governs rooted-forest statistics. Through the identities derived below—most notably $s(q)=q\,\tfrac{d}{dq}\log\chi(q)$ and the Laplace relation expressing $s(q)$ as an average of the heat trace—forest sampling via Wilson's algorithm yields estimates of $Z(\beta)=\Tr\{e^{-\beta \bL}\}$ and hence of $\brho(\beta)=Z(\beta)^{-1} e^{-\beta \bL}$ without eigendecompositions. This enables practical evaluation of thermodynamic quantities such as the internal energy $E(\beta)=\Tr(\bL\,\brho(\beta))= -\tfrac{d}{d\beta}\log Z(\beta)$ and the Von Neumann entropy $S(\brho)= -\Tr\{\brho\log\brho\}$ directly from forest data.
+
+In the spectral entropy framework the partition function $Z(\beta)$, also called \emph{heat-trace}~\cite{xiao2009graph} takes the form of a trace over the states described by the eigenvalues of $\bL$ weighted by the Boltzmann factor:
 \begin{equation}\label{eq:z}
 Z(\beta) = \Tr{e^{-\beta\bL}} = \sum_{i=1}^n e^{-\beta \lambda_i}.
 \end{equation}
-% For further usage, we remember that the series expansion of the partition function $Z(\beta)$ reads
-% \begin{equation}\label{eq:z_approx}
-% Z(\beta) = \Tr{\bI - \beta \bL + \frac{1}{2}\beta^2 \bL^2 - \frac{1}{6}\beta^3 \bL^3 + \ldots }.
-% \end{equation}
-We now give a physical and practical interpretation to the partition function $Z$ in terms of the statistics of the random variable $\Phi_q$ by connecting $\chi(q)$ and $Z(\beta)$. The central object on the forest side is the shifted spectral determinant $\chi(q)=\det(q\bI+\bL)$, which serves as a generating polynomial for rooted forests~\cite{chebotarev2002forest,chebotarev2006matrix}. For $q>0$ one can exploit the spectral calculus to express it as a trace of a matrix logarithm:
-\begin{equation}
-\chi(q) = \det(q\bI + \bL) = e^{\Tr{\log\left(q\bI + \bL \right)}}.
-\end{equation}
-where here the logarithm is the matrix functional $\log(\cdot)$.
-Taking the (scalar) logarithm makes the link to the spectrum explicit:
-\begin{equation}
-\log \chi(q) = \Tr{\log(q \bI + \bL)}.
-\end{equation}
-Substituting $q:=1/\beta$ yields the bridge to the heat kernel~\cite{chung1997}:
-\begin{equation}\label{eq:logchi_beta}
-\log \chi \left(\frac{1}{\beta}\right) = - n\log \beta + \Tr{\log(\bI + \beta \bL)}.
-\end{equation}
 
-% We conveniently rename the spectral determinant of the Laplacian as
-% \begin{equation}\label{eq:L-spec-det}
-% \zeta_{\bL}^{-1}(x) := \det(\bI - x\,\bL),\qquad x\in\mathbb{R},
-% \end{equation}
-% so that $\det(\bI + \beta\bL) = \zeta_{\bL}^{-1}(-\beta)$ and
-% \begin{equation}
-% \log \chi \left(\tfrac{1}{\beta}\right) = - n\log \beta - \log \zeta_{\bL}^{-1}(-\beta).
-% \end{equation}
-% We stress that $\zeta_{\bL}$ in Eq.~\eqref{eq:L-spec-det} is a Laplacian spectral determinant and not the classical Ihara zeta of non-backtracking walks (discussed below). 
-% It will nevertheless provide a clean analytic bridge between forests and heat diffusion.
+\subsection{From random rooted forests to heat trace}
+We now give a physical and practical interpretation to the partition function $Z$ in terms of the statistics of the random variable $\Phi_q$ by connecting $s(q)$ and $Z(\beta)$. 
 
-% The expression $\Tr{\log(\bI + \beta \bL)}$ admits a convergent Mercator series for $\lVert \beta\bL\rVert<1$, i.e. for $\beta<\lVert \bL\rVert^{-1}=\lambda_{\max}^{-1}$:
-% \begin{equation}\label{eq:mercator}
-% \Tr\,\log(\bI + \beta\bL) = \sum_{k\ge 1} \frac{(-1)^{k+1}}{k}\,\beta^k\,\Tr(\bL^k).
-% \end{equation}
-% This is complementary to the heat-kernel expansion in Eq.~\eqref{eq:z_approx} but, in contrast to earlier heuristic claims, there is no direct identity of the form $Z(\beta)=n-\log\chi(1/\beta)+\cdots$. Instead, exact integral identities link the two objects, as we show next.
-
-We now connect the forest partition function $\chi(q)$ to the heat trace $Z(\beta)$ and introduce a quantity with a direct combinatorial meaning.
-
-First note that
+For any $\beta>0$ and each Laplacian eigenvalue $\lambda_i\ge 0$ we use the identity
+\begin{equation}\label{eq:elementary_identity}
+\int_0^{\infty} e^{-(1+a)t} dt = \frac{1}{1+a},\qquad a\ge 0,
+\end{equation}
+which is the Laplace transform of the constant function. 
+Setting $a=\beta\lambda_i$ yields
 \begin{equation}
-\log\chi(q) = \sum_{i=1}^n \log(q+\lambda_i) = \Tr{\log(q\bI + \bL)},
+\frac{1}{1+\beta\lambda_i} \,=\, \int_0^{\infty} e^{-t}\, e^{-\beta\lambda_i t}\,dt.
 \end{equation}
-so that differentiation with respect to $q$ is immediate. The resolvent identity gives
+Summing over $i$ and exchanging sum and integral (justified by monotone convergence for $\beta,t\ge 0$) gives:
 \begin{equation}
-\frac{d}{dq}\log\chi(q) = \Tr{(q\bI+\bL)^{-1}} = \sum_{i=1}^n \frac{1}{q+\lambda_i}.
+\sum_{i=1}^n \frac{1}{1+\beta\lambda_i} \,=\, \int_0^{\infty} e^{-t} \sum_{i=1}^n e^{-\beta\lambda_i t}\,dt.
 \end{equation}
-Define the combinatorially meaningful function
-\begin{equation}\label{eq:s_def}
-s(q) := q\frac{d}{dq}\log\chi(q) \,=\, q\,\Tr{(q\bI+\bL)^{-1}} \,=\, \sum_{i=1}^n \frac{q}{q+\lambda_i}.
-\end{equation}
-By standard results on determinantal forest measures~\citep{hough2006determinantal,lyons2017probability,avena2018,avena2018a}, $s(q)$ equals the expected number of roots in the random forest $\Phi_q$. Thus $s(q)$ has a dual nature: it is both a smooth spectral statistic (last equality above) and a direct combinatorial observable sampled efficiently by Wilson's algorithm~\cite{wilson1996,propp1998}. Intuitively, $s(q)$ is extensive with $0\le s(q)\le n$, interpolating from spanning trees ($q\to 0$, few roots) to the edgeless forest ($q\to\infty$, $n$ roots).
-
-The link to the heat trace is obtained by a simple Laplace transform applied termwise to the spectrum.
-For any $\beta>0$ and each eigenvalue $\lambda_i$ we use the elementary identity (valid for $a\ge 0$)
-\begin{equation*}
-\int_0^{\infty} e^{-(1+a)t} dt = \frac{1}{1+a},\quad \text{so with } a=\beta\lambda_i:\; \int_0^{\infty} e^{-t} e^{-\beta\lambda_i t}\,dt = \frac{1}{1+\beta\lambda_i}.
-\end{equation*}
-Therefore,
-\begin{equation}
-\int_0^{\infty} e^{-t} e^{-\beta t \lambda_i}\,dt \,=\, \frac{1}{1+\beta\lambda_i}.
-\end{equation}
-Summing over $i$ and using $Z(x)=\sum_i e^{-x\,\lambda_i}$ (linearity and nonnegativity justify exchanging sum and integral) yields the exact identity:
+By the spectral theorem, $\Tr{e^{-\beta t\bL}}=\sum_{i=1}^n e^{-\beta\lambda_i t}$, thus recognizing the heat trace $Z(\beta t)=\Tr{e^{-\beta t\bL}}$ we obtain the identity:
 \begin{equation}\label{eq:resolvent-laplace}
 \sum_{i=1}^n \frac{1}{1+\beta\lambda_i} \,=\, \int_0^{\infty} e^{-t} Z(\beta t)\,dt.
 \end{equation}
-Setting $\beta=1/q$ gives the bridge between $s(q)$ and the heat trace (since $\sum_i \tfrac{1}{1+\lambda_i/q}=\sum_i \tfrac{q}{q+\lambda_i}=s(q)$):
+
+The bridge between $s(q)$ and the heat trace $Z(\beta)$ is obtained by simply substituting $\beta$ with $1/q$ in Eq.~\ref{eq:resolvent-laplace}, which gives:
 \begin{equation}\label{eq:sq-bridge-corr}
-s(q) \,=\, \int_0^{\infty} e^{-t}\,Z\!\left(\tfrac{t}{q}\right) dt \,=\, \int_0^{\infty} e^{-t}\,Z(\beta t)\,dt\quad(\beta=1/q).
+s(q) = \int_0^{\infty} e^{-t}\,Z\!\left(\tfrac{t}{q}\right) dt.
 \end{equation}
 
-Equivalently, by the change of variables $t=qu$ one gets the classical resolvent/heat-kernel correspondence~\cite{chung1997}
-\begin{equation*}
-s(q) \,=\, q \int_0^{\infty} e^{-q u}\, Z(u)\,du \;=\; q\, \mathcal{L}\{Z\}(q).
-\end{equation*}
+Equation~\ref{eq:sq-bridge-corr} therefore provides exact, non-perturbative relations between the forest statistics through $s(q)$ and the heat kernel $Z(\beta)$.
 
-Since $s(q)$ is the expected number of roots in the random forest $\Phi_q$ (Eq.~\ref{eq:s_def}), it can be estimated via Wilson sampling, making Eqs.~\eqref{eq:resolvent-laplace}–\eqref{eq:sq-bridge-corr} a practical route to obtain the Laplace transform of the heat trace from rooted-forest statistics.
+Importantly, no small-$\beta$ expansion is required: sampling $s(q)$ via Wilson's algorithm at a set of $q$ values gives direct, scalable estimates of the Laplace transform of $Z$.
+Since Wilson sampling gives $s(q)$ cheaply near-linear time per sample on sparse graphs~\cite{wilson1996,lyons2017probability}, Eq.~\ref{eq:sq-bridge-corr} provides a scalable estimator of the heat trace $Z(\beta)$ without the need to compute the eigenvalues of $\bL$.
 
-A second complementary identity follows from Frullani's integral. For each eigenvalue one has
-\begin{equation}
-\log(1+\beta\lambda_i) \,=\, \int_0^{\infty} \frac{e^{-t} - e^{-(1+\beta\lambda_i)t}}{t}\,dt
-\end{equation}
-and summing over $i$ gives
-\begin{equation}\label{eq:frullani-corr}
-\Tr{\log(\bI+\beta\bL)} = \int_0^{\infty} \frac{e^{-t}}{t}\,\bigl(n - Z(\beta t)\bigr)\,dt.
-\end{equation}
-Using the substitution $q=1/\beta$ together with \nolinebreak
-\nobreak\(\log\chi(1/\beta) = -n\log\beta + \Tr\log(\bI+\beta\bL)\) yields the equivalent representation
-\begin{equation}\label{eq:chi-frullani-corr}
-\log\chi(q) \,=\, n\log q + \int_0^{\infty} \frac{e^{-t}}{t}\,\bigl(n - Z(t/q)\bigr)\,dt.
-\end{equation}
-
-Equations~\eqref{eq:sq-bridge-corr} and~\eqref{eq:chi-frullani-corr} therefore provide exact, non-perturbative relations between the forest statistics (through $\chi$ and $s$) and the heat kernel $Z(\beta)$. Importantly, no small-$\beta$ expansion is required: sampling $s(q)$ via Wilson's algorithm at a set of $q$ values gives direct, scalable estimates of the Laplace transform of $Z$, and the Frullani representation provides a route to recover $\log\chi(q)$ (and hence $\chi$) from $Z$ without explicit diagonalization of $\bL$.
-
-\subsection{Thermodynamical variables}
-Thermodynamic observables follow from $Z(\beta)$ and, thanks to the bridges above, can be obtained from forest statistics without diagonalizing $\bL$. 
-This gives a complex-systems perspective: diffusion thermodynamics and the combinatorics of random forests are two faces of the same spectral object.
-We focus on the average energy and the Von Neumann entropy.
-They are spectrally defined as:
-\begin{equation}\label{eq:average_energy}
-E(\beta) = -\partial_{\beta}\log Z(\beta),\qquad S(\beta) = \log Z(\beta) + \beta E(\beta).
-\end{equation}
-
-Using the identities linking forest statistics and the heat trace (Eqs.~\ref{eq:resolvent-laplace} and~\ref{eq:frullani-corr}, or equivalently Eqs.~\ref{eq:sq-bridge-corr} and~\ref{eq:chi-frullani-corr}), we obtain a practical pipeline to compute thermodynamic observables from Wilson sampling.
-
-Recall the spectral definitions:
-\begin{equation}\label{eq:E_S_repeat}
-E(\beta) = -\partial_{\beta}\log Z(\beta),\qquad S(\beta) = \log Z(\beta) + \beta E(\beta).
-\end{equation}
-
-The key observation is that Wilson's algorithm directly samples from the measure in Eq.~\ref{eq:tree_probability} and therefore provides unbiased samples of the root set size $|\mathcal{R}(\Phi_q)|$~\cite{wilson1996,propp1998}. From a collection of independent Wilson samples at a fixed $q$ we get a Monte Carlo estimator of
-\begin{equation}\label{eq:s_est}
-s(q) = \mathbb{E}\bigl[|\mathcal{R}(\Phi_q)|\bigr] = \sum_{i=1}^n \frac{q}{q+\lambda_i}.
-\end{equation}
-
-Two complementary and practical reconstruction routes follow.
-
-1) Thermodynamic integration to obtain $\log\chi(q)$.
-Since
-\begin{equation}
-\frac{d}{dq}\log\chi(q) = \frac{1}{q}s(q),
-\end{equation}
-we can recover the spectral determinant by numerical integration:
-\begin{equation}\label{eq:thermint}
-\log\chi(q) = \log\chi(q_{\max}) + \int_{q_{\max}}^{q} \frac{s(q')}{q'}\,dq'.
-\end{equation}
-For sufficiently large $q_{\max}$ one has $\chi(q_{\max})\approx q_{\max}^n$, so the additive constant is known to leading order and the integral above is stable in practice. Because Wilson sampling gives $s(q)$ cheaply (near-linear time per sample on sparse graphs)~\cite{wilson1996,lyons2017probability}, Eq.~\ref{eq:thermint} provides a scalable estimator of $\log\chi(q)$.
-
-2) Recovering the heat trace $Z(\beta)$ (and hence $E,S$).
-Equation~\ref{eq:resolvent-laplace} (or \ref{eq:sq-bridge-corr}) expresses $s(q)$ as a Laplace-like transform of $Z$: for $\beta=1/q$,
-\begin{equation}\label{eq:s_vs_Z}
-s(q) = \int_0^{\infty} e^{-t} Z(\beta t)\,dt.
-\end{equation}
-Given a numerical estimate of $s(q)$ for a suitable grid of $q$ (equivalently, of $\beta$), standard numerical Laplace-inversion or deconvolution techniques (Tikhonov regularization, maximum-entropy inversion, or specialized Laplace solvers) recover $Z(\beta)$ at the desired $\beta$ values.
-
-The transform in Eq.~\ref{eq:s_vs_Z} is invertible in the classical sense: the heat trace $Z(\beta)$ is recovered from $s(q)$ by the inverse Laplace transform
-\begin{equation}\label{eq:Z_inverse}
-Z(\beta) \,=\, \mathcal{L}^{-1}\!\left\{\frac{s(q)}{q}\right\}(\beta) \,=\, \frac{1}{2\pi i}\int_{c-i\infty}^{c+i\infty} e^{\beta q} \frac{s(q)}{q} \,dq,
-\end{equation}
-where the Bromwich contour is taken with real part $c$ to the right of all singularities of $s(q)/q$. 
-In practice the inversion is numerically ill-conditioned, so standard regularized inversion methods are recommended (Tikhonov regularization, Talbot or Gaver–Stehfest algorithms, maximum-entropy methods, etc.). 
-Once $Z(\beta)$ is recovered, the thermodynamic observables follow by direct spectral formulas (Eq.~\ref{eq:E_S_repeat}) and numerical differentiation for $\partial_{\beta}\log Z(\beta)$.
-
-Remarks on practical accuracy and complexity: Wilson's algorithm samples forests in expected near-linear time on sparse graphs~\cite{wilson1996,propp1998,lyons2017probability}; the dominant numerical issues are (i) Monte Carlo variance of $s(q)$ (controlled by the number of Wilson samples), and (ii) the ill-conditioning of numerical Laplace inversion. In practice we find two robust patterns: estimating $\log\chi(q)$ via thermodynamic integration (route 1) is stable and requires only moderate sampling resolution in $q$, while recovering $Z(\beta)$ (route 2) benefits from mild regularization and sampling $s(q)$ over a dense set of $q$ values. Combining both routes (use thermodynamic integration to get $\log\chi$ and Laplace-inversion of $s$ to refine $Z$) yields accurate estimates of energy and entropy without eigendecomposition.
-
-In summary: Wilson sampling gives direct Monte Carlo estimates of $s(q)$ (the expected number of roots), from which we can (i) integrate to obtain $\log\chi(q)$ and (ii) invert the transform to obtain $Z(\beta)$. Both outputs allow computation of the average energy $E(\beta)$ and the Von Neumann entropy $S(\beta)$ defined above, providing a scalable, sampling-based route to thermodynamical quantities on networks.
+Practically, the dominant numerical issues are (i) Monte Carlo variance of $s(q)$ (controlled by the number of Wilson samples), and (ii) the ill-conditioning of numerical Laplace inversion.
+In practice two robust methods exist: estimating $\log\chi(q)$ via thermodynamic integration is stable and requires only moderate sampling resolution in $q$, while recovering $Z(\beta)$ benefits from mild regularization and sampling $s(q)$ over a dense set of $q$ values. 
+In figure \ref{fig:sampling_phi_q} we show the results of calculation of the heat trace $Z(\beta)$ from the expected number of roots $s(q)$ for a Barabási-Albert graph with $n=100$ nodes and $m=3$ edges.
+Numerically, we validate Eq.~\ref{eq:sq-bridge-corr} along two complementary routes: (i) Gauss-Laguerre quadrature of Eq.~\ref{eq:sq-bridge-corr} and (ii) Wilson Monte Carlo estimates of $s(q)$ from i.i.d. forests at fixed $q$, reporting the sample mean with standard-error bars.
 
 \begin{figure}[htb]
 \centering
 \includegraphics[width=0.45\textwidth]{../notebooks/artifacts/validation_s_vs_q_BA_n100_m3.pdf}
-\caption{Validation of the Wilson algorithm for sampling random spanning forests. The expected number of roots $s(q)$ is estimated via Wilson sampling for different values of $q$ for a Barabási-Albert graph with $n=100$ nodes and $m=3$ edges. The plot shows the agreement between the estimated $s(q)$ and the theoretical value for $s(q)$.}
+\caption{Validation of the Wilson algorithm for sampling random spanning forests. The expected number of roots $s(q)$ is estimated via Wilson sampling for different values of $q$ for an ensemble of Barabási-Albert graphs with $n=100$ nodes and $m=3$ edges. The plot shows the agreement between the estimated $s(q)$ and the theoretical value for $s(q)$.}
 \label{fig:sampling_phi_q}
 \end{figure}
 
+
 \section{Conclusions}
-We established exact analytic bridges between random spanning forests and the thermodynamics of diffusion on complex networks. The Laplace and Frullani transforms connect the forest partition function and the expected number of roots to the heat trace, enabling scalable estimation of thermodynamic observables directly from Wilson sampling without computing spectra. On regular graphs, we clarified the reduction of the Ihara--Bass determinant to the rooted-forest partition function under a rational change of variables, and verified the relation numerically.
+We established exact analytic bridges between random spanning forests and the thermodynamics of diffusion on complex networks. The Laplace transform connects the forest partition function and the expected number of roots to the heat trace, enabling scalable estimation of thermodynamic observables directly from Wilson sampling without computing spectra. 
 
 Beyond their conceptual interest, these relations afford practical estimators and diagnostics for large networks. 
 They provide a principled route to recover spectral moments, to compare ensembles via $s(q)$, and to bound entropy and energy.
 Future work will explore: (i) weighted and directed settings; (ii) numerical Laplace inversion strategies robust to sampling noise; (iii) asymptotic predictions for $s(q)$ in random graph models and community-structured graphs; and (iv) applications to inference, where multi-$q$ forest statistics constrain generative models.
 Altogether, the results open a path toward a rigorous network information theory grounded in forest combinatorics and heat-kernel thermodynamics.
+
+\appendix
+\section{Appendix}
+\subsection{Code and data availability}
+All the code required to run the Wilson algorithm, estimate the $s(q)$ with spectral decomposition method as well as via Monte Carlo sampling are available at \url{github.com/CarloNicolini/thermowilson}
+In this appendix we provide the details of the main results of the paper.
+\subsection{Wilson algorithm}
+We recall the Wilson $q$-algorithm for sampling random spanning forests with distribution as in Eq.~\ref{eq:tree_probability}.
+\input{wilson_algorithm}
 
 \bibliographystyle{plain}
 \bibliography{biblio}
