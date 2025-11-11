@@ -64,7 +64,9 @@ def compute_s_true(q: float, lambdas: np.ndarray) -> float:
     return float(np.sum(q / (q + lambdas)))
 
 
-def sample_s_mc(G: nx.Graph, q: float, samples: int, base_seed: int | None) -> tuple[float, float]:
+def sample_s_mc(
+    G: nx.Graph, q: float, samples: int, base_seed: int | None
+) -> tuple[float, float]:
     """Monte Carlo estimate of s(q) by averaging number of roots in q-forests.
 
     Returns (mean, standard_error).
@@ -96,9 +98,18 @@ def graph_id(kind: str, args: argparse.Namespace) -> str:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Sample s(q) across a q-grid using Wilson sampling.")
-    parser.add_argument("--graph", required=True, choices=["ER", "BA", "REG", "GRID"], help="Graph family")
-    parser.add_argument("--n", type=int, default=100, help="Number of nodes (ER/BA/REG)")
+    parser = argparse.ArgumentParser(
+        description="Sample s(q) across a q-grid using Wilson sampling."
+    )
+    parser.add_argument(
+        "--graph",
+        required=True,
+        choices=["ER", "BA", "REG", "GRID"],
+        help="Graph family",
+    )
+    parser.add_argument(
+        "--n", type=int, default=100, help="Number of nodes (ER/BA/REG)"
+    )
     parser.add_argument("--p", type=float, default=0.05, help="ER edge prob")
     parser.add_argument("--m", type=int, default=3, help="BA 'm' parameter")
     parser.add_argument("--d", type=int, default=4, help="Regular degree (REG)")
@@ -109,8 +120,15 @@ def main() -> None:
     parser.add_argument("--num-q", type=int, default=30)
     parser.add_argument("--samples-per-q", type=int, default=256)
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--outdir", type=str, default=str(ROOT / "artifacts" / "tomography"), help="Output directory base")
-    parser.add_argument("--skip-theory", action="store_true", help="Skip eigenvalue-based ground truth")
+    parser.add_argument(
+        "--outdir",
+        type=str,
+        default=str(ROOT / "artifacts" / "tomography"),
+        help="Output directory base",
+    )
+    parser.add_argument(
+        "--skip-theory", action="store_true", help="Skip eigenvalue-based ground truth"
+    )
     args = parser.parse_args()
 
     warnings.filterwarnings("ignore", category=UserWarning)
@@ -127,7 +145,9 @@ def main() -> None:
         try:
             lambdas = laplacian_eigenvalues(G)
         except Exception as e:
-            print(f"Warning: could not compute eigenvalues ({e}); proceeding without theory.")
+            print(
+                f"Warning: could not compute eigenvalues ({e}); proceeding without theory."
+            )
             lambdas = None
 
     q_grid = np.logspace(math.log10(args.q_min), math.log10(args.q_max), args.num_q)
@@ -135,7 +155,12 @@ def main() -> None:
     records: list[dict[str, float]] = []
     for q in q_grid:
         s_mean, s_se = sample_s_mc(G, float(q), args.samples_per_q, args.seed)
-        rec: dict[str, float] = {"q": float(q), "s_mc": s_mean, "s_mc_se": s_se, "g_mc": s_mean / float(q)}
+        rec: dict[str, float] = {
+            "q": float(q),
+            "s_mc": s_mean,
+            "s_mc_se": s_se,
+            "g_mc": s_mean / float(q),
+        }
         if lambdas is not None:
             s_true = compute_s_true(float(q), lambdas)
             rec["s_true"] = s_true
@@ -149,17 +174,19 @@ def main() -> None:
 
     # Plot s(q)
     fig, ax = plt.subplots(figsize=(7, 5))
-    ax.errorbar(df["q"], df["s_mc"], yerr=df["s_mc_se"], fmt="o", ms=4, lw=1, label="Wilson MC")
+    ax.errorbar(
+        df["q"], df["s_mc"], yerr=df["s_mc_se"], fmt="o", ms=4, lw=1, label="Wilson MC"
+    )
     if "s_true" in df.columns:
         ax.plot(df["q"], df["s_true"], label="theory", color="C1", lw=2)
     ax.set_xscale("log")
     ax.set_xlabel("q")
     ax.set_ylabel("s(q)")
-    ax.set_title(f"s(q) via Wilson sampling — {gid}")
+    # ax.set_title(f"s(q) via Wilson sampling — {gid}")
     ax.legend()
     fig.tight_layout()
-    fig_path = out_dir / "s_vs_q.png"
-    fig.savefig(fig_path, dpi=200)
+    fig_path = out_dir / "s_vs_q.pdf"
+    fig.savefig(fig_path, dpi=200, bbox_inches="tight")
     plt.close(fig)
     print(f"Saved: {fig_path}")
 
@@ -171,16 +198,14 @@ def main() -> None:
     ax.set_xscale("log")
     ax.set_xlabel("q")
     ax.set_ylabel("g(q) = s(q)/q")
-    ax.set_title(f"g(q) for Stieltjes inversion — {gid}")
+    # ax.set_title(f"g(q) for Stieltjes inversion — {gid.replace('_', ' ')}")
     ax.legend()
     fig.tight_layout()
-    fig_path = out_dir / "g_vs_q.png"
-    fig.savefig(fig_path, dpi=200)
+    fig_path = out_dir / "g_vs_q.pdf"
+    fig.savefig(fig_path, dpi=200, bbox_inches="tight")
     plt.close(fig)
     print(f"Saved: {fig_path}")
 
 
 if __name__ == "__main__":
     main()
-
-

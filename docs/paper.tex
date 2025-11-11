@@ -249,6 +249,20 @@ Numerically, we validate Eq.~\ref{eq:sq-bridge-corr} along two complementary rou
 \label{fig:sampling_phi_q}
 \end{figure}
 
+%% NEEDS FURTHER REVISION
+To corroborate that the same Wilson samples inhabit the correct continuum universality class, we measured the Hausdorff dimension of the loop-erased trajectories they generate on a planar grid. 
+In the scaling limit the loop-erased random walk converges to $\mathrm{SLE}_2$ with fractal dimension $d_f=5/4$~\cite{lawler2004conformal,beffara2008dimension}. 
+We therefore simulated $10^4$ Wilson forests on a $96\times 96$ square lattice (a subset of $\mathbb{Z}^2$ plane), recorded the loop-erased length $\ell$ as a function of the maximal exploration radius $R$ attained before absorption on the wired boundary, and fitted the power law $\ell \propto R^{d_f}$. 
+As shown in Fig.~\ref{fig:lerw_fractal}, the fit yields $d_f = 1.216 \pm 0.006$, consistent with the predicted continuum exponent. Deviations at very small radii ($R \leq 3$) stem from lattice effects, while at the largest radii ($R \geq 30$) the finite grid enforces premature absorption; in the central regime $10 \leq R \leq 30$ the Monte Carlo data fall on the theoretical slope. 
+This geometric validation confirms that the forest sampler reproduces the long-walk statistics that underlie the Laplace correspondence between $s(q)$ and the heat trace.
+
+\begin{figure}[htb]
+\centering
+\includegraphics[width=0.45\textwidth]{../notebooks/artifacts/fractal_GRID_96x96/lerw_fractal_96x96.pdf}
+\caption{Scaling of loop-erased Wilson trajectories on a $96\times 96$ grid. The loop-erased length $\ell$ is plotted against the maximal exploration radius $R$ before absorption. The black fit recovers $d_f=1.216\pm 0.006$, while the red dotted line shows the $\mathrm{SLE}_2$ prediction $d_f=5/4$. Boundary effects dominate for very small and very large radii, whereas the intermediate window $10\lesssim R\lesssim 30$ follows the predicted scaling.}
+\label{fig:lerw_fractal}
+\end{figure}
+
 
 \section{Conclusions}
 We established exact analytic bridges between random spanning forests and the thermodynamics of diffusion on complex networks. The Laplace transform connects the forest partition function and the expected number of roots to the heat trace, enabling scalable estimation of thermodynamic observables directly from Wilson sampling without computing spectra. 

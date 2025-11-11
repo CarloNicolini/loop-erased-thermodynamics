@@ -2,37 +2,49 @@
 """
 Unified CLI for Wilson algorithm experiments and spectral analysis.
 
-This module provides three main subcommands:
+This module provides four main subcommands:
 - sample-s: Sample s(q) via Wilson's q-forest sampler
 - reconstruct: Inverse spectral density reconstruction from s(q) measurements
 - validate: Validate forest-heat-kernel identities via Wilson sampling
+- fractal: Estimate LERW fractal dimension on wired 2D grids
 """
 
-import math
 import os
-import warnings
 from pathlib import Path
 
-import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
 import pandas as pd
-import seaborn as sns
 import typer
 from joblib import Parallel, delayed
 from rich import print as rprint
 from typing_extensions import Annotated
 
-from wilson.graphs import build_graph, graph_id, relabel_consecutive
+from wilson.fractal import run_fractal_dimension_experiment
 from wilson.inversion import compute_bin_widths, invert_stieltjes_density
 from wilson.parallel import estimate_s_for_validate, sample_wilson_for_q
-from wilson.plotting import save_plot_both_formats
+from wilson.plotting import (
+    plot_g_vs_q,
+    plot_s_vs_q,
+    plot_spectrum_reconstruction,
+    plot_validation_s_vs_q,
+    plot_validation_Z_vs_beta,
+    save_plot_both_formats,
+)
 from wilson.spectral import (
     heat_trace_from_spectrum,
     laplacian_eigenvalues,
     s_from_spectrum,
     s_from_Z_via_gauss_laguerre,
 )
+from wilson.utils import (
+    compute_eigenvalues_safe,
+    compute_histogram_density,
+    make_logspace_grid,
+    setup_graph_and_output,
+    setup_plotting_style,
+)
+from wilson.validation import build_validation_graphs
 
 app = typer.Typer(
     help="Wilson algorithm CLI for thermodynamic graph analysis",
@@ -41,12 +53,12 @@ app = typer.Typer(
 
 
 # ============================================================================
-# Subcommand 1: sample-s
+# Subcommand 1: sample the s function
 # ============================================================================
 
 
-@app.command(name="sample-s")
-def sample_s(
+@app.command(name="sample")
+def sample(
     graph: Annotated[str, typer.Option(help="Graph family: ER, BA, REG, GRID")] = "ER",
     n: Annotated[int, typer.Option(help="Number of nodes (ER/BA/REG)")] = 100,
     p: Annotated[float, typer.Option(help="Edge probability (ER)")] = 0.05,
@@ -121,31 +133,16 @@ def sample_s(
     - Two plots are generated: s(q) and g(q) = s(q)/q
     - Standard errors are computed from MC samples
     """
-    warnings.filterwarnings("ignore", category=UserWarning)
-    sns.set_context("talk")
-    sns.set_style("whitegrid")
-
-    # Build graph
-    G = build_graph(graph, n=n, p=p, m=m, d=d, rows=rows, cols=cols, seed=seed)
-    gid = graph_id(graph, n=n, p=p, m=m, d=d, rows=rows, cols=cols)
-    out_dir = Path(outdir) / gid
-    os.makedirs(out_dir, exist_ok=True)
-
-    rprint(f"[bold cyan]Graph:[/bold cyan] {gid}")
-    rprint(f"  Nodes: {G.number_of_nodes()}, Edges: {G.number_of_edges()}")
-
-    # Compute eigenvalues once and cache
-    lambdas = None
-    if not skip_theory:
-        try:
-            rprint("[yellow]Computing eigenvalues (once)...[/yellow]")
-            lambdas = laplacian_eigenvalues(G)
-        except Exception as e:
-            rprint(f"[red]Warning:[/red] could not compute eigenvalues ({e})")
-            lambdas = None
+    setup_plotting_style("talk", "whitegrid")
+    G, gid, out_dir = setup_graph_and_output(
+        graph, outdir, n=n, p=p, m=m, d=d, rows=rows, cols=cols, seed=seed
+    )
+    lambdas = compute_eigenvalues_safe(
+        G, compute=not skip_theory, description="eigenvalues (once)"
+    )
 
     # Sample s(q) across q-grid in parallel
-    q_grid = np.logspace(math.log10(q_min), math.log10(q_max), num_q)
+    q_grid = make_logspace_grid(q_min, q_max, num_q)
     rprint(f"[yellow]Sampling s(q) for {num_q} q-values (parallel)...[/yellow]")
 
     # Parallel execution with cached eigenvalues
@@ -166,45 +163,9 @@ def sample_s(
     df.to_csv(csv_path, index=False)
     rprint(f"[green]✓[/green] Saved: {csv_path}")
 
-    # Plot s(q)
-    fig, ax = plt.subplots(figsize=(7, 5))
-    ax.errorbar(
-        df["q"],
-        df["s_mc"],
-        yerr=df["s_mc_se"],
-        fmt="o",
-        ms=4,
-        lw=1,
-        label="Wilson MC",
-    )
-    if "s_true" in df.columns:
-        ax.plot(df["q"], df["s_true"], label="theory", color="C1", lw=2)
-    ax.set_xscale("log")
-    ax.set_xlabel("q")
-    ax.set_ylabel("s(q)")
-    ax.set_title(f"s(q) via Wilson sampling — {gid}")
-    ax.legend()
-    fig.tight_layout()
-    fig_path = out_dir / "s_vs_q.png"
-    fig.savefig(fig_path, dpi=200)
-    plt.close(fig)
-    rprint(f"[green]✓[/green] Saved: {fig_path}")
-
-    # Plot g(q) = s/q
-    fig, ax = plt.subplots(figsize=(7, 5))
-    ax.plot(df["q"], df["g_mc"], "o", ms=4, label="g_mc = s/q")
-    if "g_true" in df.columns:
-        ax.plot(df["q"], df["g_true"], label="g_true", lw=2)
-    ax.set_xscale("log")
-    ax.set_xlabel("q")
-    ax.set_ylabel("g(q) = s(q)/q")
-    ax.set_title(f"g(q) for Stieltjes inversion — {gid}")
-    ax.legend()
-    fig.tight_layout()
-    fig_path = out_dir / "g_vs_q.png"
-    fig.savefig(fig_path, dpi=200)
-    plt.close(fig)
-    rprint(f"[green]✓[/green] Saved: {fig_path}")
+    # Generate plots using library functions
+    plot_s_vs_q(df, out_dir, gid, save=True)
+    plot_g_vs_q(df, out_dir, gid, save=True)
 
 
 # ============================================================================
@@ -347,18 +308,10 @@ def reconstruct(
     - KDE uses seaborn for flexible normalization control
     - Regularization parameters control smoothness vs fidelity tradeoff
     """
-    warnings.filterwarnings("ignore", category=UserWarning)
-    sns.set_context("talk")
-    sns.set_style("whitegrid")
-
-    # Build graph
-    G = build_graph(graph, n=n, p=p, m=m, d=d, rows=rows, cols=cols, seed=seed)
-    gid = graph_id(graph, n=n, p=p, m=m, d=d, rows=rows, cols=cols)
-    out_dir = Path(outdir) / gid
-    os.makedirs(out_dir, exist_ok=True)
-
-    rprint(f"[bold cyan]Graph:[/bold cyan] {gid}")
-    rprint(f"  Nodes: {G.number_of_nodes()}, Edges: {G.number_of_edges()}")
+    setup_plotting_style("talk", "whitegrid")
+    G, gid, out_dir = setup_graph_and_output(
+        graph, outdir, n=n, p=p, m=m, d=d, rows=rows, cols=cols, seed=seed
+    )
 
     # Load or compute s(q) data
     csv_path = out_dir / "s_vs_q.csv" if s_csv is None else Path(s_csv)
@@ -367,13 +320,10 @@ def reconstruct(
         s_df = pd.read_csv(csv_path)
     elif compute_s:
         rprint("[yellow]Computing s(q) from scratch (parallel)...[/yellow]")
-        q_grid = np.logspace(math.log10(q_min), math.log10(q_max), num_q)
-
-        # Compute eigenvalues once for efficiency
-        try:
-            lambdas_for_s = laplacian_eigenvalues(G)
-        except Exception:
-            lambdas_for_s = None
+        q_grid = make_logspace_grid(q_min, q_max, num_q)
+        lambdas_for_s = compute_eigenvalues_safe(
+            G, compute=True, description="eigenvalues for s(q)"
+        )
 
         # Parallel execution
         records = Parallel(n_jobs=-1, backend="loky")(
@@ -483,14 +433,9 @@ def reconstruct(
     rprint(f"[green]✓[/green] Saved: {s_csv}")
 
     # Optionally compute truth
-    lambdas = None
-    if compute_theory:
-        try:
-            rprint("[yellow]Computing eigenvalues for validation...[/yellow]")
-            lambdas = laplacian_eigenvalues(G)
-        except Exception as e:
-            rprint(f"[red]Warning:[/red] could not compute eigenvalues ({e})")
-            lambdas = None
+    lambdas = compute_eigenvalues_safe(
+        G, compute=compute_theory, description="eigenvalues for validation"
+    )
 
     # Spectrum DataFrame
     spec_df = pd.DataFrame(
@@ -503,98 +448,19 @@ def reconstruct(
         }
     )
     if lambdas is not None:
-        # Histogram on edges consistent with center grid
-        mids = 0.5 * (lam_grid[1:] + lam_grid[:-1])
-        left_edge = max(0.0, lam_grid[0] - (mids[0] - lam_grid[0]))
-        right_edge = lam_grid[-1] + (lam_grid[-1] - mids[-1])
-        edges = np.concatenate([[left_edge], mids, [right_edge]])
-        counts, edges = np.histogram(lambdas, bins=edges)
-        bin_widths = np.diff(edges)
-        density_true = (counts.astype(float) / n_nodes) / np.maximum(bin_widths, 1e-12)
+        # Compute histogram density using library function
+        density_true = compute_histogram_density(lambdas, lam_grid, n_nodes)
         spec_df["density_true"] = density_true
 
     spec_csv = out_dir / "spectrum.csv"
     spec_df.to_csv(spec_csv, index=False)
     rprint(f"[green]✓[/green] Saved: {spec_csv}")
 
-    # Plot s(q)
-    fig, ax = plt.subplots(figsize=(7, 5))
-    ax.errorbar(
-        s_df["q"],
-        s_df["s_mc"],
-        yerr=s_df.get("s_mc_se", None),
-        fmt="o",
-        ms=4,
-        lw=1,
-        label="Wilson MC",
+    # Generate plots using library functions
+    plot_s_vs_q(s_df, out_dir, gid, save=True)
+    plot_spectrum_reconstruction(
+        spec_df, out_dir, gid, lambdas, kde_bw, kde_normalize, save=True
     )
-    if "s_fit" in s_df.columns:
-        ax.plot(s_df["q"], s_df["s_fit"], label="fit", lw=2)
-    if "s_true" in s_df.columns:
-        ax.plot(s_df["q"], s_df["s_true"], label="theory", lw=2)
-    ax.set_xscale("log")
-    ax.set_xlabel("q")
-    ax.set_ylabel("s(q)")
-    ax.set_title(f"s(q): MC vs fit — {gid}")
-    ax.legend()
-    fig.tight_layout()
-    fig_path = out_dir / "s_vs_q_fit.png"
-    fig.savefig(fig_path, dpi=200)
-    plt.close(fig)
-    rprint(f"[green]✓[/green] Saved: {fig_path}")
-
-    # Plot spectral density
-    fig, ax = plt.subplots(figsize=(7, 5))
-    ax.plot(
-        spec_df["lambda"], spec_df["density_hat"], label="reconstructed density", lw=2
-    )
-    if "density_true" in spec_df.columns:
-        ax.step(
-            spec_df["lambda"],
-            spec_df["density_true"],
-            where="mid",
-            label="true histogram",
-            alpha=0.6,
-        )
-        # Rug plot
-        ax.scatter(
-            lambdas,
-            np.zeros_like(lambdas),
-            marker="|",
-            color="k",
-            alpha=0.3,
-            label="eigs",
-        )
-        # KDE using seaborn with normalize control
-        try:
-            rprint(f"[yellow]Computing KDE (normalize={kde_normalize})...[/yellow]")
-            # Use seaborn's kdeplot with explicit normalization control
-            kde_data = pd.DataFrame({"lambda": lambdas})
-            sns.kdeplot(
-                data=kde_data,
-                x="lambda",
-                bw_adjust=kde_bw,
-                ax=ax,
-                label="true KDE",
-                color="C2",
-                lw=2,
-                alpha=0.9,
-                # The 'common_norm' parameter controls normalization
-                # When True (default), normalizes to integrate to 1
-                common_norm=kde_normalize,
-            )
-        except Exception as e:
-            rprint(f"[red]Warning:[/red] KDE failed ({e})")
-
-    ax.set_xlabel("lambda")
-    ax.set_ylabel("spectral density (normalized)")
-    ax.set_title(f"Spectral density reconstruction — {gid}")
-    ax.legend()
-    fig.tight_layout()
-    fig_path = out_dir / "spectrum.png"
-    fig.savefig(fig_path, dpi=200)
-    plt.close(fig)
-    rprint(f"[green]✓[/green] Saved: {fig_path}")
 
 
 # ============================================================================
@@ -695,33 +561,20 @@ def validate(
     - Reports relative errors for quadrature and Monte Carlo estimates
     - Validates the identity: s(q) = ∫_0^∞ e^{-t} Z(t/q) dt
     """
-    warnings.filterwarnings("ignore", category=UserWarning)
-    sns.set_context("paper")
-    sns.set_style("whitegrid")
+    setup_plotting_style("paper", "whitegrid")
 
     out_path = Path(outdir)
     os.makedirs(out_path, exist_ok=True)
 
     rprint("[bold cyan]Forest-Heat Kernel Validation[/bold cyan]")
 
-    # Build graphs
-    rng = np.random.default_rng(seed)
-    graphs: dict[str, nx.Graph] = {}
+    # Build graphs using library function
+    graphs = build_validation_graphs(
+        er_n, er_p, ba_n, ba_m, grid_rows, grid_cols, reg_n, reg_d, seed
+    )
 
-    G_er = nx.erdos_renyi_graph(er_n, er_p, seed=int(rng.integers(1, 2**31 - 1)))
-    graphs[f"ER_n{er_n}_p{er_p:.3f}"] = G_er
-
-    G_ba = nx.barabasi_albert_graph(ba_n, ba_m, seed=int(rng.integers(1, 2**31 - 1)))
-    graphs[f"BA_n{ba_n}_m{ba_m}"] = G_ba
-
-    G_grid = nx.grid_2d_graph(grid_rows, grid_cols)
-    graphs[f"GRID_{grid_rows}x{grid_cols}"] = relabel_consecutive(G_grid)
-
-    G_reg = nx.random_regular_graph(reg_d, reg_n, seed=int(rng.integers(1, 2**31 - 1)))
-    graphs[f"REG_n{reg_n}_d{reg_d}"] = G_reg
-
-    q_values = np.logspace(math.log10(q_min), math.log10(q_max), num_q)
-    beta_values = np.logspace(math.log10(beta_min), math.log10(beta_max), num_beta)
+    q_values = make_logspace_grid(q_min, q_max, num_q)
+    beta_values = make_logspace_grid(beta_min, beta_max, num_beta)
 
     # Process each graph
     for name, G in graphs.items():
@@ -764,44 +617,67 @@ def validate(
         rprint(f"  [green]rel error s_from_Z (GL):[/green] {rel_err_quad:.3e}")
         rprint(f"  [green]rel error s Wilson MC:[/green] {rel_err_mc:.3e}")
 
-        # Plot s(q) validation
-        fig, ax = plt.subplots(figsize=(8, 5))
-        ax.semilogx(q_values, s_spec, label="spectral s(q)", color="#1f77b4", lw=1)
-        ax.semilogx(
-            q_values,
-            s_quad,
-            label="from Z via Gauss-Laguerre",
-            color="#2ca02c",
-            lw=1,
-            ls="--",
+        # Generate validation plots using library functions
+        fig, ax = plot_validation_s_vs_q(
+            q_values, s_spec, s_quad, s_mc_mean, s_mc_sem, name
         )
-        ax.errorbar(
-            q_values,
-            s_mc_mean,
-            yerr=s_mc_sem,
-            fmt="o",
-            color="#d62728",
-            ecolor="#ff9896",
-            elinewidth=1.0,
-            capsize=3,
-            label="Wilson MC",
-        )
-        ax.set_xlabel("q")
-        ax.set_ylabel("s(q) = E[#roots]")
-        ax.set_title(f"s(q) validation — {name}")
-        ax.legend(frameon=True)
         save_plot_both_formats(fig, out_path, f"validation_s_vs_q_{name}")
 
-        # Plot Z(β) heat trace
-        fig, ax = plt.subplots(figsize=(8, 5))
-        ax.semilogx(beta_values, Z_spec, label="spectral Z(β)", color="#1f77b4", lw=1)
-        ax.set_xlabel("β")
-        ax.set_ylabel("Z(β) = Tr e^{-βL}")
-        ax.set_title(f"Heat trace — {name}")
-        ax.legend(frameon=True)
+        fig, ax = plot_validation_Z_vs_beta(beta_values, Z_spec, name)
         save_plot_both_formats(fig, out_path, f"validation_Z_vs_beta_{name}")
 
     rprint(f"\n[bold green]✓ All figures saved to {out_path}[/bold green]")
+
+
+@app.command()
+def fractal(
+    rows: Annotated[int, typer.Option(help="Grid rows")] = 48,
+    cols: Annotated[int, typer.Option(help="Grid columns")] = 48,
+    samples: Annotated[int, typer.Option(help="Number of LERW samples")] = 20000,
+    seed: Annotated[int, typer.Option(help="Random seed")] = 123,
+    outdir: Annotated[
+        str, typer.Option(help="Base output directory")
+    ] = "notebooks/artifacts",
+    log_bins: Annotated[int, typer.Option(help="Log-spaced bins for averaging")] = 18,
+    max_scatter: Annotated[
+        int,
+        typer.Option(
+            help="Max scatter points to plot (0 skips scatter, negative keeps all)"
+        ),
+    ] = 4000,
+) -> None:
+    """
+    Estimate the LERW fractal dimension on a wired 2D grid.
+
+    Samples loop-erased random walks, measures loop-erased length vs Euclidean
+    span, fits the scaling exponent, and saves CSV/JSON artifacts alongside a
+    diagnostic plot.
+    """
+
+    setup_plotting_style("paper", "whitegrid")
+    summary = run_fractal_dimension_experiment(
+        rows=rows,
+        cols=cols,
+        samples=samples,
+        seed=seed,
+        outdir=outdir,
+        log_bins=log_bins,
+        max_scatter=max_scatter,
+    )
+    rprint(
+        "[bold cyan]Estimated fractal dimension:[/bold cyan] "
+        f"d_f = {summary.df_estimate:.3f}"
+        + (
+            f" ± {1.96 * summary.df_stderr:.3f}"
+            if np.isfinite(summary.df_stderr)
+            else ""
+        )
+    )
+    summary_path = (
+        Path(outdir) / f"fractal_GRID_{rows}x{cols}" / "lerw_fractal_summary.json"
+    )
+    if summary_path.exists():
+        rprint(f"[green]✓[/green] Summary saved to {summary_path}")
 
 
 if __name__ == "__main__":
