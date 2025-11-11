@@ -454,11 +454,11 @@ def main() -> None:
     ax.set_xscale("log")
     ax.set_xlabel("q")
     ax.set_ylabel("s(q)")
-    ax.set_title(f"s(q): MC vs fit — {gid}")
+    # ax.set_title(f"s(q): MC vs fit — {gid}")
     ax.legend()
     fig.tight_layout()
-    fig_path = out_dir / "s_vs_q_fit.png"
-    fig.savefig(fig_path, dpi=200)
+    fig_path = out_dir / "s_vs_q_fit.pdf"
+    fig.savefig(fig_path, dpi=200, bbox_inches="tight")
     plt.close(fig)
     print(f"Saved: {fig_path}")
 
@@ -489,11 +489,11 @@ def main() -> None:
             ax.plot(lam_kde, density_kde, label="true KDE", color="C2", lw=2, alpha=0.9)
     ax.set_xlabel("lambda")
     ax.set_ylabel("spectral density (normalized)")
-    ax.set_title(f"Spectral density reconstruction — {gid}")
+    # ax.set_title(f"Spectral density reconstruction — {gid}")
     ax.legend()
     fig.tight_layout()
-    fig_path = out_dir / "spectrum.png"
-    fig.savefig(fig_path, dpi=200)
+    fig_path = out_dir / "spectrum.pdf"
+    fig.savefig(fig_path, dpi=200, bbox_inches="tight")
     plt.close(fig)
     print(f"Saved: {fig_path}")
 

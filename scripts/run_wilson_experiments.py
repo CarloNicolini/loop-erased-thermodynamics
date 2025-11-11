@@ -105,13 +105,11 @@ def run_one_graph(kind: str, G: nx.Graph, trials=10000, outdir: Path = None):
     ax.plot([mn, mx], [mn, mx], color="#333333", linestyle="--", linewidth=1)
     ax.set_xlabel("theory $p_e$", fontsize=10)
     ax.set_ylabel("empirical $\hat p_e$", fontsize=10)
-    ax.set_title(name, fontsize=11)
+    # ax.set_title(name, fontsize=11)
     fig.tight_layout()
-    fig_path_png = outdir / f"{name}_emp_vs_theory.png"
     fig_path_pdf = outdir / f"{name}_emp_vs_theory.pdf"
-    fig.savefig(fig_path_png, dpi=200)
     # save PDF high-quality for LaTeX inclusion
-    fig.savefig(fig_path_pdf, dpi=300)
+    fig.savefig(fig_path_pdf, dpi=300, bbox_inches="tight")
     plt.close(fig)
 
     # simple metrics
