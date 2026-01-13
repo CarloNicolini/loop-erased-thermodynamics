@@ -2,11 +2,9 @@
 """
 Unified CLI for Wilson algorithm experiments and spectral analysis.
 
-This module provides four main subcommands:
-- sample-s: Sample s(q) via Wilson's q-forest sampler
+This module provides two main subcommands:
+- sample: Sample s(q) via Wilson's q-forest sampler
 - reconstruct: Inverse spectral density reconstruction from s(q) measurements
-- validate: Validate forest-heat-kernel identities via Wilson sampling
-- fractal: Estimate LERW fractal dimension on wired 2D grids
 """
 
 from pathlib import Path
