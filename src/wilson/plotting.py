@@ -306,7 +306,8 @@ def plot_Z_reconstruction(
     fig, ax = plt.subplots(figsize=(7, 5))
 
     if Z_true is not None:
-        ax.loglog(beta, Z_true, label="Z true", color="C1", lw=1)
+        Z_true = np.asarray(Z_true, dtype=float)
+        ax.loglog(beta, Z_true, label="Z true", color="orange", lw=1.5)
     ax.loglog(beta, Z_hat, label="Z reconstructed", color="C0", lw=1.5)
 
     if Z_ci_lower is not None and Z_ci_upper is not None:

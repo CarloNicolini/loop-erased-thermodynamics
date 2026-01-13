@@ -632,8 +632,17 @@ def reconstruct_spectrum_from_wilson_graph(
     # Ground truth Z(β) if spectrum is known (for diagnostics)
     try:
         lambdas_exact = np.array(nx.laplacian_spectrum(G), dtype=float)
-        Z_true = z_from_spectrum(beta, lambdas_exact)
-    except Exception:
+        if lambdas_exact.size > 0:
+            Z_true = z_from_spectrum(beta, lambdas_exact)
+        else:
+            Z_true = None
+    except Exception as e:
+        # Log the error for debugging but continue without Z_true
+        import warnings
+
+        warnings.warn(
+            f"Failed to compute Z_true from Laplacian spectrum: {e}", UserWarning
+        )
         Z_true = None
 
     Z_ci_lower: Optional[np.ndarray] = None

@@ -29,30 +29,41 @@ def z_from_graph(beta: float, G: nx.Graph) -> float:
     return z_from_spectrum(beta, nx.laplacian_spectrum(G))
 
 
-def z_from_spectrum(beta: float, lambdas: np.ndarray) -> float:
+def z_from_spectrum(
+    beta: float | np.ndarray, lambdas: np.ndarray
+) -> float | np.ndarray:
     """
     Compute the partition function Z(β) from Laplacian eigenvalues.
 
     Parameters
     ----------
-    beta : float
-        Inverse temperature.
+    beta : float or np.ndarray
+        Inverse temperature(s). If array, returns array of Z values.
     lambdas : np.ndarray
         Array of Laplacian eigenvalues.
 
     Returns
     -------
-    float
+    float or np.ndarray
         Partition function Z(β) = sum_i exp(-β λ_i).
+        Returns float if beta is scalar, array if beta is array.
 
     Examples
     --------
     >>> lambdas = np.array([0.0, 1.0, 2.0])
-    >>> Z = partition_function_from_spectrum(beta=1.0, lambdas=lambdas)
+    >>> Z = z_from_spectrum(beta=1.0, lambdas=lambdas)
+    >>> Z_array = z_from_spectrum(beta=np.array([0.5, 1.0, 2.0]), lambdas=lambdas)
     """
+    beta = np.asarray(beta, dtype=float)
     lambdas = np.asarray(lambdas, dtype=float)
-    Z = np.sum(np.exp(-beta * lambdas))
-    return float(Z)
+    is_scalar = beta.ndim == 0
+    beta = beta.reshape(-1) if not is_scalar else beta
+
+    # Compute Z(β) for each beta: Z = sum_i exp(-β λ_i)
+    # Shape: (n_beta, n_lambdas) -> (n_beta,)
+    Z = np.sum(np.exp(-np.outer(beta, lambdas)), axis=1)
+
+    return float(Z.item()) if is_scalar else Z
 
 
 def spectral_entropy(beta: float, G: nx.Graph) -> float:
@@ -73,7 +84,7 @@ def spectral_entropy(beta: float, G: nx.Graph) -> float:
     -----
     The spectral entropy is defined as:
         H = -sum(p_i * log(p_i))
-    where p_i=e^{-\beta \lambda_i}/Z
+    where p_i=e^{-beta * lambda_i}/Z
     """
     lambdas = nx.laplacian_spectrum(G)
     n = len(lambdas)
@@ -138,7 +149,7 @@ def z_from_density(
     np.ndarray
         Approximated partition function
 
-        .. math:: Z(\beta) \approx n\sum_k \rho_k e^{-\beta \lambda_k}\,\Delta\lambda_k
+        # Z(β) ≈ n × Σₖ [ ρₖ · exp(−β λₖ) · Δλₖ ]
     """
     beta = np.asarray(beta, dtype=float)
     lam_grid = np.asarray(lam_grid, dtype=float)
@@ -173,6 +184,6 @@ def g_from_spectrum(q, lambdas: np.ndarray) -> float:
     Returns
     -------
     float
-        g(q) = sum_i 1/(q+\lambda_i)
+        g(q) = sum_i 1/(q+ lambda_i)
     """
     return s_from_spectrum(q, lambdas) / q
