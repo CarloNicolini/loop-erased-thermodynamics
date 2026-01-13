@@ -2,7 +2,6 @@
 
 import math
 import os
-import re
 import warnings
 from pathlib import Path
 
@@ -14,7 +13,6 @@ import seaborn as sns
 from rich import print as rprint
 
 from wilson.graphs import build_graph, graph_id
-from wilson.spectral import laplacian_eigenvalues
 
 
 def setup_plotting_style(context: str = "paper", style: str = "whitegrid") -> None:
@@ -45,16 +43,16 @@ def setup_plotting_style(context: str = "paper", style: str = "whitegrid") -> No
     - Seaborn context and style
     """
     warnings.filterwarnings("ignore", category=UserWarning)
-    
+
     # Seaborn settings
     sns.set_context(context)
     sns.set_style(style)
-    
+
     # Matplotlib settings for research-paper quality
     mpl.rcParams["figure.autolayout"] = True  # Enables tight layout
     plt.rcParams["font.family"] = "sans-serif"
     plt.rcParams["font.sans-serif"] = "Helvetica"
-    
+
     # Enable TeX rendering for proper subscripts/superscripts
     plt.rcParams["text.usetex"] = False  # Use mathtext, not full LaTeX
     plt.rcParams["mathtext.fontset"] = "custom"
@@ -113,12 +111,12 @@ def format_label(text: str) -> str:
             if text.lower() == greek:
                 return symbol
         return text
-    
+
     # Split on underscore
     parts = text.split("_", 1)
     main = parts[0]
     subscript = parts[1] if len(parts) > 1 else ""
-    
+
     # Convert Greek letter names to symbols
     greek_map = {
         "lambda": r"\lambda",
@@ -131,18 +129,16 @@ def format_label(text: str) -> str:
         "sigma": r"\sigma",
         "tau": r"\tau",
     }
-    
+
     main_symbol = greek_map.get(main.lower(), main)
-    
+
     # Format with roman subscript
     if subscript:
         return f"${main_symbol}_{{\mathrm{{{subscript}}}}}$"
     return f"${main_symbol}$"
 
 
-def make_logspace_grid(
-    x_min: float, x_max: float, num_points: int
-) -> np.ndarray:
+def make_logspace_grid(x_min: float, x_max: float, num_points: int) -> np.ndarray:
     """
     Create log-spaced grid of points.
 
@@ -178,6 +174,20 @@ def setup_graph_and_output(
     d: int | None = None,
     rows: int | None = None,
     cols: int | None = None,
+    blocks: int | None = None,
+    block_size: int | None = None,
+    p_in: float | None = None,
+    p_out: float | None = None,
+    tau1: float | None = None,
+    tau2: float | None = None,
+    mu: float | None = None,
+    average_degree: float | None = None,
+    min_degree: int | None = None,
+    max_degree: int | None = None,
+    min_community: int | None = None,
+    max_community: int | None = None,
+    tol: float | None = 1e-7,
+    max_iters: int | None = 500,
     seed: int | None = None,
 ) -> tuple[nx.Graph, str, Path]:
     """
@@ -186,7 +196,7 @@ def setup_graph_and_output(
     Parameters
     ----------
     graph_type : str
-        Graph family (ER, BA, REG, GRID).
+        Graph family (ER, BA, REG, GRID, SBM).
     outdir : str
         Base output directory.
     n : int, optional
@@ -201,6 +211,34 @@ def setup_graph_and_output(
         Grid rows.
     cols : int, optional
         Grid columns.
+    blocks : int, optional
+        Number of communities (SBM).
+    block_size : int, optional
+        Community size (SBM).
+    p_in : float, optional
+        Intra-community edge probability (SBM).
+    p_out : float, optional
+        Inter-community edge probability (SBM).
+    tau1 : float, optional
+        Degree exponent (LFR).
+    tau2 : float, optional
+        Community-size exponent (LFR).
+    mu : float, optional
+        Mixing parameter (LFR).
+    average_degree : float, optional
+        Average degree (LFR).
+    min_degree : int, optional
+        Minimum degree (LFR).
+    max_degree : int, optional
+        Maximum degree (LFR).
+    min_community : int, optional
+        Minimum community size (LFR).
+    max_community : int, optional
+        Maximum community size (LFR).
+    tol : float, optional
+        Tolerance for LFR generation.
+    max_iters : int, optional
+        Maximum iterations for LFR generation.
     seed : int, optional
         Random seed.
 
@@ -221,54 +259,60 @@ def setup_graph_and_output(
     >>> gid
     'ER_n100_p0.050'
     """
-    G = build_graph(graph_type, n=n, p=p, m=m, d=d, rows=rows, cols=cols, seed=seed)
-    gid = graph_id(graph_type, n=n, p=p, m=m, d=d, rows=rows, cols=cols)
+    G = build_graph(
+        graph_type,
+        n=n,
+        p=p,
+        m=m,
+        d=d,
+        rows=rows,
+        cols=cols,
+        blocks=blocks,
+        block_size=block_size,
+        p_in=p_in,
+        p_out=p_out,
+        tau1=tau1,
+        tau2=tau2,
+        mu=mu,
+        average_degree=average_degree,
+        min_degree=min_degree,
+        max_degree=max_degree,
+        min_community=min_community,
+        max_community=max_community,
+        tol=tol,
+        max_iters=max_iters,
+        seed=seed,
+    )
+    gid = graph_id(
+        graph_type,
+        n=n,
+        p=p,
+        m=m,
+        d=d,
+        rows=rows,
+        cols=cols,
+        blocks=blocks,
+        block_size=block_size,
+        p_in=p_in,
+        p_out=p_out,
+        tau1=tau1,
+        tau2=tau2,
+        mu=mu,
+        average_degree=average_degree,
+        min_degree=min_degree,
+        max_degree=max_degree,
+        min_community=min_community,
+        max_community=max_community,
+        tol=tol,
+        max_iters=max_iters,
+    )
     out_dir = Path(outdir) / gid
     os.makedirs(out_dir, exist_ok=True)
-    
+
     rprint(f"[bold cyan]Graph:[/bold cyan] {gid}")
     rprint(f"  Nodes: {G.number_of_nodes()}, Edges: {G.number_of_edges()}")
-    
+
     return G, gid, out_dir
-
-
-def compute_eigenvalues_safe(
-    G: nx.Graph, compute: bool = True, description: str = "eigenvalues"
-) -> np.ndarray | None:
-    """
-    Compute eigenvalues with error handling.
-
-    Parameters
-    ----------
-    G : nx.Graph
-        Input graph.
-    compute : bool
-        If False, skip computation and return None.
-    description : str
-        Description for progress message.
-
-    Returns
-    -------
-    np.ndarray or None
-        Laplacian eigenvalues, or None if computation failed or skipped.
-
-    Examples
-    --------
-    >>> import networkx as nx
-    >>> G = nx.path_graph(10)
-    >>> lambdas = compute_eigenvalues_safe(G, compute=True)
-    >>> len(lambdas) if lambdas is not None else 0
-    10
-    """
-    if not compute:
-        return None
-    
-    try:
-        rprint(f"[yellow]Computing {description}...[/yellow]")
-        return laplacian_eigenvalues(G)
-    except Exception as e:
-        rprint(f"[red]Warning:[/red] could not compute eigenvalues ({e})")
-        return None
 
 
 def compute_histogram_density(
@@ -308,11 +352,10 @@ def compute_histogram_density(
     left_edge = max(0.0, lam_grid[0] - (mids[0] - lam_grid[0]))
     right_edge = lam_grid[-1] + (lam_grid[-1] - mids[-1])
     edges = np.concatenate([[left_edge], mids, [right_edge]])
-    
+
     # Compute histogram
     counts, _ = np.histogram(lambdas, bins=edges)
     bin_widths = np.diff(edges)
     density = (counts.astype(float) / n_nodes) / np.maximum(bin_widths, 1e-12)
-    
-    return density
 
+    return density

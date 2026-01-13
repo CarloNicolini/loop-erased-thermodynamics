@@ -1,14 +1,32 @@
 """Plotting utilities for Wilson algorithm visualizations."""
 
 from pathlib import Path
+import math
+from typing import Callable, Iterable, Sequence
 
 import matplotlib.pyplot as plt
+import networkx as nx
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from matplotlib import patches
 from rich import print as rprint
 
-from wilson.utils import format_label
+
+def _component_colors(n: int) -> list[tuple[float, float, float]]:
+    """Return up to n colours sampled from the tab20 palette."""
+
+    if n <= 0:
+        return []
+    tab20 = plt.get_cmap("tab20")
+    # Use even indices first to maximize contrast, then odds.
+    order = list(range(0, tab20.N, 2)) + list(range(1, tab20.N, 2))
+    colours: list[tuple[float, float, float]] = []
+    for i in range(n):
+        idx = order[i % len(order)]
+        rgba = tab20(idx)
+        colours.append((float(rgba[0]), float(rgba[1]), float(rgba[2])))
+    return colours
 
 
 def save_plot_both_formats(fig: plt.Figure, out_path: Path, base_name: str) -> None:
@@ -89,9 +107,10 @@ def plot_s_vs_q(
         label="Wilson MC",
     )
     if "s_fit" in df.columns:
-        ax.plot(df["q"], df["s_fit"], label="fit", lw=2)
-    if "s_true" in df.columns:
-        ax.plot(df["q"], df["s_true"], label="theory", color="C1", lw=2)
+        ax.plot(df["q"], df["s_fit"], label="Wilson MC", lw=1)
+    if "s_spec" in df.columns:
+        ax.plot(df["q"], df["s_spec"], label="Spectral", color="C1", lw=1)
+
     ax.set_xscale("log")
     ax.set_xlabel("$q$")
     ax.set_ylabel("$s(q)$")
@@ -135,9 +154,19 @@ def plot_g_vs_q(
         Matplotlib axes.
     """
     fig, ax = plt.subplots(figsize=(7, 5))
-    ax.plot(df["q"], df["g_mc"], "o", ms=4, label=r"$g_{\mathrm{mc}} = s/q$")
-    if "g_true" in df.columns:
-        ax.plot(df["q"], df["g_true"], label=r"$g_{\mathrm{true}}$", lw=2)
+    ax.errorbar(
+        df["q"],
+        df["g_mc"],
+        yerr=df.get("g_mc_se", None),
+        fmt="o",
+        ms=4,
+        lw=1,
+        label="Wilson MC",
+    )
+    if "g_fit" in df.columns:
+        ax.plot(df["q"], df["g_fit"], label="Wilson MC", lw=1)
+    if "g_spec" in df.columns:
+        ax.plot(df["q"], df["g_spec"], label="spectral", color="C1", lw=1)
     ax.set_xscale("log")
     ax.set_xlabel("$q$")
     ax.set_ylabel("$g(q) = s(q)/q$")
@@ -190,7 +219,7 @@ def plot_spectrum_reconstruction(
         Matplotlib axes.
     """
     fig, ax = plt.subplots(figsize=(7, 5))
-    ax.plot(spec_df["lambda"], spec_df["density_hat"], label="reconstructed", lw=2)
+    ax.plot(spec_df["lambda"], spec_df["density_hat"], label="reconstructed", lw=1)
 
     if "density_true" in spec_df.columns and lambdas is not None:
         ax.step(
@@ -220,7 +249,7 @@ def plot_spectrum_reconstruction(
                 ax=ax,
                 label="KDE",
                 color="C2",
-                lw=2,
+                lw=1,
                 alpha=0.9,
                 common_norm=kde_normalize,
             )
@@ -237,6 +266,66 @@ def plot_spectrum_reconstruction(
         fig_path = out_path / "spectrum.pdf"
         fig.savefig(fig_path, dpi=200, bbox_inches="tight")
         rprint(f"[green]✓[/green] Saved: {fig_path}")
+
+    return fig, ax
+
+
+def plot_Z_reconstruction(
+    beta: np.ndarray,
+    Z_hat: np.ndarray,
+    out_path: Path,
+    graph_id: str,
+    Z_true: np.ndarray | None = None,
+    Z_ci_lower: np.ndarray | None = None,
+    Z_ci_upper: np.ndarray | None = None,
+    save: bool = True,
+) -> tuple[plt.Figure, plt.Axes]:
+    """Create Z(β) reconstruction plot with optional CIs and ground truth.
+
+    Parameters
+    ----------
+    beta : np.ndarray
+        β-grid.
+    Z_hat : np.ndarray
+        Reconstructed partition function values.
+    out_path : Path
+        Output directory.
+    graph_id : str
+        Graph identifier for filenames.
+    Z_true : np.ndarray, optional
+        Spectral ground truth Z(β) values.
+    Z_ci_lower, Z_ci_upper : np.ndarray, optional
+        Lower and upper credible intervals for Z(β).
+    save : bool, default True
+        If True, save plot in PDF and PNG formats.
+    """
+
+    beta = np.asarray(beta, dtype=float)
+    Z_hat = np.asarray(Z_hat, dtype=float)
+
+    fig, ax = plt.subplots(figsize=(7, 5))
+
+    if Z_true is not None:
+        ax.loglog(beta, Z_true, label="Z true", color="C1", lw=1)
+    ax.loglog(beta, Z_hat, label="Z reconstructed", color="C0", lw=1.5)
+
+    if Z_ci_lower is not None and Z_ci_upper is not None:
+        ax.fill_between(
+            beta,
+            Z_ci_lower,
+            Z_ci_upper,
+            alpha=0.25,
+            label="15–85% CI",
+            color="C0",
+        )
+
+    ax.set_xlabel(r"$\beta$")
+    ax.set_ylabel(r"$Z(\beta)$")
+    ax.legend()
+    ax.grid(True, which="both", ls=":")
+
+    if save:
+        save_plot_both_formats(fig, out_path, f"Z_reconstruction_{graph_id}")
 
     return fig, ax
 

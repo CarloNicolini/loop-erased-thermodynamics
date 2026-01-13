@@ -4,12 +4,11 @@
 Provides two classes:
 """
 
-import random
 from typing import Optional
-import numpy as np
+
 import networkx as nx
-import matplotlib
-import matplotlib.pyplot as plt
+import numpy as np
+from wilson.spectral import s_from_spectrum
 
 
 class Wilson:
@@ -22,57 +21,93 @@ class Wilson:
         use the WilsonQ variant that attaches an extra root with weight q.
     random_state : int or None
         Seed for reproducibility.
-    eigenvalues : np.ndarray or None
-        Precomputed Laplacian eigenvalues. If provided, avoids recomputation
-        during fit(). Performance optimization for repeated fitting with same graph.
 
     Notes
     -----
     After calling ``fit(G)`` the estimator exposes attributes:
     - ``G_``: the fitted graph
     - ``nv_``: number of nodes
-    - ``s_``: (only when q is not None) value of sum(q / (q + lambda_i))
+    - ``s_``: (only when q is not None) Wilson (Monte Carlo) estimate of s(q) on G.
+    - ``g_``: (only when q is not None) estimate of g(q) = s(q)/q on G.
     """
 
     def __init__(
         self,
         q: Optional[float] = None,
         random_state: Optional[int] = None,
-        eigenvalues: Optional[np.ndarray] = None,
     ):
         self.q = q
         self.random_state = random_state
-        self.eigenvalues = eigenvalues
         # attributes set in fit
         self.G_ = None
         self.nv_ = None
         self.s_ = None
+        self.s_std_ = None
+        self.g_ = None
+        self.g_std_ = None
 
-    def get_params(self, deep=True):
-        return {"q": self.q, "random_state": self.random_state}
+    def fit(self, X: nx.Graph, **fit_params):
+        """Fit the estimator on graph X.
 
-    def set_params(self, **params):
-        for k, v in params.items():
-            setattr(self, k, v)
-        return self
+        If ``q`` is provided, computes Monte Carlo estimates of s(q) by
+        drawing ``n_samples`` Wilson forests and storing the mean and
+        standard error in ``self.s_`` and ``self.s_std_``.
+        Also stores ``g_ = s_/q`` and ``g_std_``.
 
-    def fit(self, G: nx.Graph):
-        """Fit the estimator on graph G. Computes s_ when q is provided."""
-        self.G_ = G
-        self.nv_ = G.number_of_nodes()
+        Parameters
+        ----------
+        G : nx.Graph
+            Input graph to fit.
+
+        Keyword Arguments
+        -----------------
+        n_samples : int or None
+            Number of Monte Carlo samples to draw for estimating s(q).
+            If None, uses the estimator's ``self.n_samples`` value.
+
+        Returns
+        -------
+        self
+        """
+        self.nv_ = X.number_of_nodes()
+        # Keep original graph, but build an internal integer-labelled copy
+        # for sampling routines (nodes 0..n-1). This avoids issues when the
+        # input graph uses arbitrary labels (tuples, strings, ...).
+        self.G_ = X
+        self._G_indexed = nx.convert_node_labels_to_integers(X, first_label=0)
         # prepare RNG
         self._rng = np.random.RandomState(self.random_state)
-        if self.q is not None:
-            # Use precomputed eigenvalues if available
-            if self.eigenvalues is not None:
-                lambdai = self.eigenvalues
-            else:
-                L = nx.laplacian_matrix(G).toarray()
-                lambdai = np.linalg.eigvalsh(L)
-            # s = sum(q / (q + lambda_i))
-            self.s_ = float(np.sum(self.q / (self.q + lambdai)))
-        else:
+
+        n_samples = fit_params.get("n_samples", 1)
+
+        if self.q is None:
+            # nothing to estimate for classic unweighted Wilson in this API
             self.s_ = None
+            self.s_std_ = None
+            self.g_ = None
+            self.g_std_ = None
+            return self
+
+        # draw n_samples independent forests and compute root counts
+        root_counts = np.empty(n_samples)
+        for i in range(n_samples):
+            _, roots = self.sample()
+            root_counts[i] = len(roots)
+
+        self.s_all_ = root_counts
+        s_mean = root_counts.mean()
+        s_std = root_counts.std()
+
+        self.s_ = s_mean
+        self.s_std_ = s_std
+        # g = s / q
+        try:
+            self.g_ = s_mean / (self.q)
+            self.g_std_ = s_std / (self.q)
+        except Exception:
+            self.g_ = None
+            self.g_std_ = None
+
         return self
 
     # internal helper to draw a random neighbor using either G_ or H
@@ -83,7 +118,7 @@ class Wilson:
         nbrs = list(graph[v])
         return nbrs[self._rng.randint(0, len(nbrs))]
 
-    def sample(self, seed: Optional[int] = None):
+    def sample(self):
         """Sample a spanning tree (or forest) from the fitted graph.
 
         Returns
@@ -93,16 +128,11 @@ class Wilson:
         roots : list
             Nodes that are roots (no successor).
         """
-        if self.G_ is None:
-            raise RuntimeError("Estimator not fitted. Call fit(G) before sampling.")
-
         # create RNG for this call
-        if seed is None:
-            rng = self._rng
-        else:
-            rng = np.random.RandomState(seed)
 
-        # Classic Wilson (no q): simple undirected G_
+        # Classic Wilson (no q): operate on integer-labelled internal graph
+        Gint = getattr(self, "_G_indexed", self.G_)
+        # Classic Wilson (no q): simple undirected Gint
         if self.q is None:
             InTree = [False] * self.nv_
             Next = {}
@@ -113,12 +143,12 @@ class Wilson:
             for i in range(self.nv_):
                 u = i
                 while not InTree[u]:
-                    nbrs = list(self.G_[u])
+                    nbrs = list(Gint[u])
                     if len(nbrs) == 0:
                         Next[u] = None
                         InTree[u] = True
                         break
-                    v = nbrs[rng.randint(0, len(nbrs))]
+                    v = nbrs[self._rng.randint(0, len(nbrs))]
                     Next[u] = v
                     u = v
                 u = i
@@ -135,14 +165,16 @@ class Wilson:
             return T, roots
 
         # q variant: build directed weighted graph H
+        # Use integer-labelled graph for building H
+        Gint = getattr(self, "_G_indexed", self.G_)
         H = nx.DiGraph()
         H.add_nodes_from(range(self.nv_ + 1))
-        for u, v in self.G_.edges():
+        for u, v in Gint.edges():
             H.add_edge(u, v, weight=1.0)
             H.add_edge(v, u, weight=1.0)
         root = self.nv_
-        for u in self.G_.nodes():
-            H.add_edge(u, root, weight=float(self.q))
+        for u in Gint.nodes():
+            H.add_edge(u, root, weight=self.q)
 
         intree = [False] * H.number_of_nodes()
         successor = {}
@@ -151,21 +183,26 @@ class Wilson:
         intree[root] = True
         successor[root] = None
 
-        order = [root] + list(range(self.nv_))
-        rng.shuffle(order)
+        # Iterate over graph nodes in random order (root is already intree)
+        order = list(range(self.nv_))
+        self._rng.shuffle(order)
 
         for i in order:
             u = i
             while not intree[u]:
                 nei = list(H.neighbors(u))
-                weights = np.array(
-                    [H.get_edge_data(u, w)["weight"] for w in nei], dtype=float
-                )
+                if not nei:
+                    # Defensive: isolated node in H (shouldn't normally occur),
+                    # mark as root and break the walk.
+                    successor[u] = None
+                    intree[u] = True
+                    break
+                weights = np.array([H.get_edge_data(u, w)["weight"] for w in nei])
                 if weights.sum() == 0:
-                    v = rng.choice(nei)
+                    v = self._rng.choice(nei)
                 else:
                     probs = weights / weights.sum()
-                    v = np.random.RandomState(rng.randint(2**31)).choice(nei, p=probs)
+                    v = self._rng.choice(nei, p=probs.astype(float))
                 successor[u] = v
                 if v == root:
                     roots.add(u)
@@ -183,120 +220,28 @@ class Wilson:
 
         return F, list(roots)
 
-    # sklearn-like transform alias
-    def transform(self, X=None, n_samples: int = 1, seed: Optional[int] = None):
-        """Alias to sample; kept for transformer compatibility.
 
-        Returns a list of sampled forests/trees (length n_samples).
-        """
-        results = []
-        base = seed if seed is not None else None
-        for i in range(n_samples):
-            s = None if base is None else base + i
-            results.append(self.sample(seed=s))
-        return results
-
-
-class WilsonQ:
-    def __init__(self, G, q):
-        self.G = G
-        self.nv = G.number_of_nodes()
-        self.q = float(q)
-        self.H = nx.DiGraph()
-        self.H.add_nodes_from(range(self.nv + 1))
-        for u, v in G.edges():
-            self.H.add_edge(u, v, weight=1.0)
-            self.H.add_edge(v, u, weight=1.0)
-        self.root = self.nv
-        for u in G.nodes():
-            self.H.add_edge(u, self.root, weight=self.q)
-
-    def random_successor(self, v):
-        nei = list(self.H.neighbors(v))
-        weights = np.array(
-            [self.H.get_edge_data(v, u)["weight"] for u in nei], dtype=float
-        )
-        if weights.sum() == 0:
-            return random.choice(nei)
-        probs = weights / weights.sum()
-        return np.random.choice(nei, p=probs)
-
-    def sample(self, seed=None):
-        if seed is not None:
-            np.random.seed(int(seed))
-            random.seed(int(seed))
-
-        intree = [False] * self.H.number_of_nodes()
-        successor = {}
-        F = nx.DiGraph()
-        roots = set()
-        intree[self.root] = True
-        successor[self.root] = None
-
-        order = [self.root] + list(range(self.nv))
-        random.shuffle(order)
-
-        for i in order:
-            u = i
-            while not intree[u]:
-                successor[u] = self.random_successor(u)
-                if successor[u] == self.root:
-                    roots.add(u)
-                u = successor[u]
-            u = i
-            while not intree[u]:
-                intree[u] = True
-                u = successor[u]
-
-        for i in range(self.nv):
-            if i in successor:
-                v = successor[i]
-                if v is not None and v != self.root:
-                    F.add_edge(i, v)
-
-        return F, list(roots)
-
-    def s(self):
-        L = nx.laplacian_matrix(self.G).toarray()
-        lambdai = np.linalg.eigvalsh(L)
-        return float(np.sum(self.q / (self.q + lambdai)))
-
-
-def draw_sampling(G, T, root_nodes=None, ax=None, cmap=None, pos=None):
-    if ax is None:
-        fig, ax = plt.subplots()
-    if cmap is None:
-        cmap = matplotlib.cm.get_cmap("Set3")
-    Tdig = nx.DiGraph()
-    Tdig.add_edges_from(T)
-    if pos is None:
-        pos = nx.spectral_layout(G)
-    if root_nodes is not None:
-        nx.draw_networkx_nodes(
-            G, pos=pos, nodelist=root_nodes, node_color="r", node_size=25, ax=ax
-        )
-    nx.draw_networkx_nodes(G, pos=pos, node_color="k", node_size=3, ax=ax)
-    nx.draw_networkx_edges(G, pos=pos, alpha=0.1, edge_color="k", ax=ax)
-    comps = list(nx.weakly_connected_components(Tdig))
-    for i, comp in enumerate(comps):
-        sub = Tdig.subgraph(comp).copy()
-        e = sub.number_of_edges()
-        nx.draw_networkx_edges(
-            sub,
-            pos=pos,
-            width=2,
-            edge_color=[cmap(float(i) / max(1, len(comps)))] * e,
-            ax=ax,
-        )
-    ax.set_axis_off()
-    return ax
-
-
-def quad(x, y):
-    pos = {}
-    k = 0
-    for i in range(x):
-        for j in range(y):
-            pos[k] = np.array([i, j])
-            k += 1
-    return pos
+def sample_wilson(
+    q: float,
+    G: nx.Graph,
+    n_samples: int,
+    seed: int,
+    lambdas: np.ndarray | None,
+    compute_theory: bool = True,
+) -> dict:
+    """Helper function to sample s(q) for a single q value."""
+    wilson = Wilson(q=q, random_state=seed)
+    wilson.fit(G, n_samples=n_samples)
+    record = {
+        "q": q,
+        "s_mc": wilson.s_,
+        "s_mc_se": wilson.s_std_,
+        "g_mc": wilson.g_,
+        "g_mc_se": wilson.g_std_,
+    }
+    if compute_theory and lambdas is not None:
+        s_spec = s_from_spectrum(q, lambdas)
+        g_spec = s_spec / q if q != 0.0 else 0.0
+        record["s_spec"] = s_spec
+        record["g_spec"] = g_spec
+    return record
