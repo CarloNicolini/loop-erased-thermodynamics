@@ -1,3 +1,4 @@
+![thermowilson library logo](docs/thermowilson.png)
 # ThermoWilson
 
 Wilson algorithm experiments for thermodynamic graph analysis. This project implements Wilson's algorithm and its variants (Wilson-Q) to sample spanning forests and reconstruct spectral properties of graphs.
